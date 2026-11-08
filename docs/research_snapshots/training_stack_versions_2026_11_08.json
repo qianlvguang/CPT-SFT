@@ -1,0 +1,148 @@
+{
+  "checked_on": "2026-11-08",
+  "timezone": "Asia/Shanghai",
+  "scope": "公开 release 元数据；不代表本机已安装或整套依赖已兼容。",
+  "repositories": {
+    "NVIDIA/Megatron-LM": {
+      "api_url": "https://api.github.com/repos/NVIDIA/Megatron-LM/releases?per_page=20",
+      "latest_endpoint_url": "https://api.github.com/repos/NVIDIA/Megatron-LM/releases/latest",
+      "latest_endpoint_result": {
+        "tag_name": "core_v0.20.0",
+        "published_at": "2026-10-29T21:06:49Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA/Megatron-LM/releases/tag/core_v0.20.0"
+      },
+      "first_visible_release_in_list": {
+        "tag_name": "core_v0.20.0",
+        "published_at": "2026-10-29T21:06:49Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA/Megatron-LM/releases/tag/core_v0.20.0"
+      },
+      "first_stable_release_in_list": {
+        "tag_name": "core_v0.20.0",
+        "published_at": "2026-10-29T21:06:49Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA/Megatron-LM/releases/tag/core_v0.20.0"
+      },
+      "selected_stable_release": {
+        "tag_name": "core_v0.20.0",
+        "published_at": "2026-10-29T21:06:49Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA/Megatron-LM/releases/tag/core_v0.20.0"
+      }
+    },
+    "NVIDIA-NeMo/Megatron-Bridge": {
+      "api_url": "https://api.github.com/repos/NVIDIA-NeMo/Megatron-Bridge/releases?per_page=20",
+      "latest_endpoint_url": "https://api.github.com/repos/NVIDIA-NeMo/Megatron-Bridge/releases/latest",
+      "latest_endpoint_result": {
+        "tag_name": "v0.7.0",
+        "published_at": "2026-10-30T03:39:25Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA-NeMo/Megatron-Bridge/releases/tag/v0.7.0"
+      },
+      "first_visible_release_in_list": {
+        "tag_name": "v0.7.0",
+        "published_at": "2026-10-30T03:39:25Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA-NeMo/Megatron-Bridge/releases/tag/v0.7.0"
+      },
+      "first_stable_release_in_list": {
+        "tag_name": "v0.7.0",
+        "published_at": "2026-10-30T03:39:25Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA-NeMo/Megatron-Bridge/releases/tag/v0.7.0"
+      },
+      "selected_stable_release": {
+        "tag_name": "v0.7.0",
+        "published_at": "2026-10-30T03:39:25Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA-NeMo/Megatron-Bridge/releases/tag/v0.7.0"
+      }
+    },
+    "modelscope/ms-swift": {
+      "api_url": "https://api.github.com/repos/modelscope/ms-swift/releases?per_page=20",
+      "latest_endpoint_url": "https://api.github.com/repos/modelscope/ms-swift/releases/latest",
+      "latest_endpoint_result": {
+        "tag_name": "v4.6.0",
+        "published_at": "2026-10-13T13:30:04Z",
+        "prerelease": false,
+        "html_url": "https://github.com/modelscope/ms-swift/releases/tag/v4.6.0"
+      },
+      "first_visible_release_in_list": {
+        "tag_name": "v4.6.0",
+        "published_at": "2026-10-13T13:30:04Z",
+        "prerelease": false,
+        "html_url": "https://github.com/modelscope/ms-swift/releases/tag/v4.6.0"
+      },
+      "first_stable_release_in_list": {
+        "tag_name": "v4.6.0",
+        "published_at": "2026-10-13T13:30:04Z",
+        "prerelease": false,
+        "html_url": "https://github.com/modelscope/ms-swift/releases/tag/v4.6.0"
+      },
+      "selected_stable_release": {
+        "tag_name": "v4.6.0",
+        "published_at": "2026-10-13T13:30:04Z",
+        "prerelease": false,
+        "html_url": "https://github.com/modelscope/ms-swift/releases/tag/v4.6.0"
+      }
+    },
+    "modelscope/mcore-bridge": {
+      "api_url": "https://api.github.com/repos/modelscope/mcore-bridge/releases?per_page=20",
+      "latest_endpoint_url": "https://api.github.com/repos/modelscope/mcore-bridge/releases/latest",
+      "latest_endpoint_result": {
+        "tag_name": "v1.6.5",
+        "published_at": "2026-10-13T09:52:29Z",
+        "prerelease": false,
+        "html_url": "https://github.com/modelscope/mcore-bridge/releases/tag/v1.6.5"
+      },
+      "first_visible_release_in_list": {
+        "tag_name": "v1.6.5",
+        "published_at": "2026-10-13T09:52:29Z",
+        "prerelease": false,
+        "html_url": "https://github.com/modelscope/mcore-bridge/releases/tag/v1.6.5"
+      },
+      "first_stable_release_in_list": {
+        "tag_name": "v1.6.5",
+        "published_at": "2026-10-13T09:52:29Z",
+        "prerelease": false,
+        "html_url": "https://github.com/modelscope/mcore-bridge/releases/tag/v1.6.5"
+      },
+      "selected_stable_release": {
+        "tag_name": "v1.6.5",
+        "published_at": "2026-10-13T09:52:29Z",
+        "prerelease": false,
+        "html_url": "https://github.com/modelscope/mcore-bridge/releases/tag/v1.6.5"
+      }
+    },
+    "NVIDIA/Model-Optimizer": {
+      "api_url": "https://api.github.com/repos/NVIDIA/Model-Optimizer/releases?per_page=20",
+      "latest_endpoint_url": "https://api.github.com/repos/NVIDIA/Model-Optimizer/releases/latest",
+      "latest_endpoint_result": {
+        "tag_name": "0.48.0",
+        "published_at": "2026-11-02T10:57:53Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA/Model-Optimizer/releases/tag/0.48.0"
+      },
+      "first_visible_release_in_list": {
+        "tag_name": "0.47.1",
+        "published_at": "2026-11-06T20:22:15Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA/Model-Optimizer/releases/tag/0.47.1"
+      },
+      "first_stable_release_in_list": {
+        "tag_name": "0.47.1",
+        "published_at": "2026-11-06T20:22:15Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA/Model-Optimizer/releases/tag/0.47.1"
+      },
+      "selected_stable_release": {
+        "tag_name": "0.48.0",
+        "published_at": "2026-11-02T10:57:53Z",
+        "prerelease": false,
+        "html_url": "https://github.com/NVIDIA/Model-Optimizer/releases/tag/0.48.0"
+      }
+    }
+  },
+  "selection_note": "优先采用发布日不晚于调研截止时间的官方 releases/latest 稳定版本；releases 列表第一项可能是旧分支补丁，不据此判断最新稳定版本。"
+}

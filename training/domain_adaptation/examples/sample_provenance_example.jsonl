@@ -1,0 +1,1 @@
+{"sample_id": "demo_qa_001", "row_index": 0, "source_map": {"S1": {"doc_id": "demo_rule_v1", "title": "教学合成规则", "version": "demo-v1", "locator": "第二条", "content_sha256": "ca71ba7fd50afa2eea99c38d198ea4cd292d5c4295650e0ef1b21dd1ca397416", "source_url": null}}, "split": "example_only", "style_id": "rigorous_detailed_cited_v1", "is_real_training_data": false}

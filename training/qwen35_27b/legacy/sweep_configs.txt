@@ -1,0 +1,39 @@
+# Experiment list for sweep_pipeline.sh
+# Format:  <name>  KEY=VALUE KEY=VALUE ...      ('#' = comment)
+# A name with no overrides = pipeline defaults:
+#   S1 mini   v1-v4  ViT LoRA r16 + merger LoRA r32 (@1e-5), LLM r64 3e-5 -> 3e-6
+#   S2 medium v1-v4  visual frozen,                          LLM r64 2e-5 -> 2e-6
+#   S3 final  v1-v4  visual frozen,                          LLM r64 1e-5 -> 1e-6
+#   1 epoch per stage, no V5.
+# Stages with identical config are trained ONCE and shared, so keep the
+# baseline first. Run `bash sweep_pipeline.sh plan` to see the sharing.
+# Delete / comment out the lines you don't want.
+
+# --- 0. reference ------------------------------------------------------------
+baseline
+
+# --- A. S3 learning rate (reuses baseline S1+S2 -> only S3 retrained) --------
+s3_lr5e-6        S3_LR=5e-6 S3_MIN_LR=5e-7
+s3_lr2e-5        S3_LR=2e-5 S3_MIN_LR=2e-6
+
+# --- B. where LoRA goes in the later stages ----------------------------------
+# merger LoRA in S3 only (reuses baseline S1+S2) — NEW combination, SMOKE first
+s3_merger_lora   S3_MERGER=lora S3_ALIGNER_LR=5e-6
+# merger LoRA in S2 (and therefore a new S3 on top of it)
+s2_merger_lora   S2_MERGER=lora S2_ALIGNER_LR=1e-5
+
+# --- C. S1 recipe (changes S1 -> all three stages retrained) -----------------
+# S1 with the merger trained full-param (the original S1 recipe)
+s1_merger_full   S1_MERGER=full S1_ALIGNER_LR=5e-6
+
+# --- D. LLM LoRA size in every stage (all three stages retrained) ------------
+llm_r128         S1_LLM_RANK=128 S1_LLM_ALPHA=256 S2_LLM_RANK=128 S2_LLM_ALPHA=256 S3_LLM_RANK=128 S3_LLM_ALPHA=256
+
+# --- E. is S2 needed? (S3 directly on top of baseline S1) --------------------
+no_s2            S2_ENABLE=0
+
+# --- F. examples, off by default ---------------------------------------------
+# s3_2ep         S3_EPOCHS=2
+# s3_with_v5     S3_DATA=train_caption_ultra_x_v1final.parquet,train_caption_ultra_x_v2final.parquet,train_caption_ultra_x_v3final.parquet,train_caption_ultra_x_v4final.parquet,train_rough_templete.parquet
+# from_s2L       START_STAGE=3 S2_MODEL=/data/autovision-cfs/autovision-notebook/algo4/tpz/ft/sft-qwen3_5-27b-vis-tripple-L/checkpoint-XXXX-merged
+# seed7          SEED=7

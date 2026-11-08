@@ -7,3 +7,17 @@ __pycache__/
 output/
 *_smoke/
 checkpoint-*/
+
+# 本地缓存、环境、模型与数据
+.local_cache/
+.venv*/
+.env
+.env.*
+!.env.example
+models/
+datasets/
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.whl

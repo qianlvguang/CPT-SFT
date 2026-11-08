@@ -1,0 +1,208 @@
+{
+  "checked_on": "2026-11-08",
+  "purpose": "仅提取公开配置字段和元数据；未下载模型权重。",
+  "models": {
+    "Qwen/Qwen3.5-27B": {
+      "revision": "fc05daec18b0a78c049392ed2e771dde82bdf654",
+      "config_url": "https://huggingface.co/Qwen/Qwen3.5-27B/resolve/fc05daec18b0a78c049392ed2e771dde82bdf654/config.json",
+      "config_sha256": "f8d190c5b89c1521220f935d2567a587d6e291ed69066a45a106560b05a2174c",
+      "safetensors_metadata": {
+        "parameters": {
+          "BF16": 27781419504,
+          "F32": 8448
+        },
+        "total": 27781427952
+      },
+      "index_metadata": {
+        "total_size": 55562872800
+      },
+      "architecture": [
+        "Qwen3_5ForConditionalGeneration"
+      ],
+      "text_fields": {
+        "attention_bias": false,
+        "attention_dropout": 0.0,
+        "attn_output_gate": true,
+        "dtype": "bfloat16",
+        "eos_token_id": 248044,
+        "full_attention_interval": 4,
+        "head_dim": 256,
+        "hidden_act": "silu",
+        "hidden_size": 5120,
+        "initializer_range": 0.02,
+        "intermediate_size": 17408,
+        "linear_conv_kernel_dim": 4,
+        "linear_key_head_dim": 128,
+        "linear_num_key_heads": 16,
+        "linear_num_value_heads": 48,
+        "linear_value_head_dim": 128,
+        "max_position_embeddings": 262144,
+        "mlp_only_layers": [],
+        "model_type": "qwen3_5_text",
+        "mtp_num_hidden_layers": 1,
+        "mtp_use_dedicated_embeddings": false,
+        "num_attention_heads": 24,
+        "num_hidden_layers": 64,
+        "num_key_value_heads": 4,
+        "rms_norm_eps": 1e-06,
+        "use_cache": true,
+        "vocab_size": 248320,
+        "mamba_ssm_dtype": "float32",
+        "rope_parameters": {
+          "mrope_interleaved": true,
+          "mrope_section": [
+            11,
+            11,
+            10
+          ],
+          "rope_type": "default",
+          "rope_theta": 10000000,
+          "partial_rotary_factor": 0.25
+        }
+      },
+      "layer_counts": {
+        "full_attention": 16,
+        "linear_attention": 48
+      },
+      "vision_fields": {
+        "deepstack_visual_indexes": [],
+        "depth": 27,
+        "hidden_act": "gelu_pytorch_tanh",
+        "hidden_size": 1152,
+        "in_channels": 3,
+        "initializer_range": 0.02,
+        "intermediate_size": 4304,
+        "model_type": "qwen3_5",
+        "num_heads": 16,
+        "num_position_embeddings": 2304,
+        "out_hidden_size": 5120,
+        "patch_size": 16,
+        "spatial_merge_size": 2,
+        "temporal_patch_size": 2
+      },
+      "tie_word_embeddings": false,
+      "quantization": {},
+      "quantization_exclusions": {
+        "count": 0,
+        "vision_count": 0,
+        "linear_attention_count": 0,
+        "other": []
+      }
+    },
+    "Qwen/Qwen3.5-27B-FP8": {
+      "revision": "97f5941bf617e31c5e237364a8602ce3f03a551a",
+      "config_url": "https://huggingface.co/Qwen/Qwen3.5-27B-FP8/resolve/97f5941bf617e31c5e237364a8602ce3f03a551a/config.json",
+      "config_sha256": "53f7e06eebbfe64e70eb0b0979f3da31de9aff6870594e9cf731ba3961501adc",
+      "safetensors_metadata": {
+        "parameters": {
+          "BF16": 3082211824,
+          "F8_E4M3": 24699207680,
+          "F32": 8448
+        },
+        "total": 27781427952
+      },
+      "index_metadata": {
+        "total_size": 30866680160
+      },
+      "architecture": [
+        "Qwen3_5ForConditionalGeneration"
+      ],
+      "text_fields": {
+        "attention_bias": false,
+        "attention_dropout": 0.0,
+        "attn_output_gate": true,
+        "dtype": "bfloat16",
+        "eos_token_id": 248044,
+        "full_attention_interval": 4,
+        "head_dim": 256,
+        "hidden_act": "silu",
+        "hidden_size": 5120,
+        "initializer_range": 0.02,
+        "intermediate_size": 17408,
+        "linear_conv_kernel_dim": 4,
+        "linear_key_head_dim": 128,
+        "linear_num_key_heads": 16,
+        "linear_num_value_heads": 48,
+        "linear_value_head_dim": 128,
+        "max_position_embeddings": 262144,
+        "mlp_only_layers": [],
+        "model_type": "qwen3_5_text",
+        "mtp_num_hidden_layers": 1,
+        "mtp_use_dedicated_embeddings": false,
+        "num_attention_heads": 24,
+        "num_hidden_layers": 64,
+        "num_key_value_heads": 4,
+        "rms_norm_eps": 1e-06,
+        "use_cache": true,
+        "vocab_size": 248320,
+        "mamba_ssm_dtype": "float32",
+        "rope_parameters": {
+          "mrope_interleaved": true,
+          "mrope_section": [
+            11,
+            11,
+            10
+          ],
+          "rope_type": "default",
+          "rope_theta": 10000000,
+          "partial_rotary_factor": 0.25
+        }
+      },
+      "layer_counts": {
+        "full_attention": 16,
+        "linear_attention": 48
+      },
+      "vision_fields": {
+        "deepstack_visual_indexes": [],
+        "depth": 27,
+        "hidden_act": "gelu_pytorch_tanh",
+        "hidden_size": 1152,
+        "in_channels": 3,
+        "initializer_range": 0.02,
+        "intermediate_size": 4304,
+        "model_type": "qwen3_5",
+        "num_heads": 16,
+        "num_position_embeddings": 2304,
+        "out_hidden_size": 5120,
+        "patch_size": 16,
+        "spatial_merge_size": 2,
+        "temporal_patch_size": 2
+      },
+      "tie_word_embeddings": false,
+      "quantization": {
+        "quant_method": "fp8",
+        "activation_scheme": "dynamic",
+        "weight_per_tensor": false,
+        "act_per_tensor": false,
+        "weight_block_size": [
+          128,
+          128
+        ]
+      },
+      "quantization_exclusions": {
+        "count": 259,
+        "vision_count": 112,
+        "linear_attention_count": 144,
+        "other": [
+          "lm_head",
+          "model.language_model.embed_tokens",
+          "mtp.fc"
+        ]
+      }
+    }
+  },
+  "transformers_source": {
+    "revision": "a6f5c8676b158c367dc3389f68dde7a97fb619d6",
+    "source_url": "https://raw.githubusercontent.com/huggingface/transformers/a6f5c8676b158c367dc3389f68dde7a97fb619d6/src/transformers/models/qwen3_5/modeling_qwen3_5.py",
+    "sha256": "4463b8a108f678c166755101d95f188179f54143305953d78147de0389b80ebc"
+  },
+  "derived_estimates": {
+    "method": "按已核对的配置和 Transformers 线性层形状手算；单 TP1 序列，不含运行时额外开销；均非 GPU 实测。",
+    "dense_ffn_projection_parameters": 17112760320,
+    "full_attention_projection_parameters": 1677721600,
+    "bf16_full_attention_kv_bytes_per_token": 65536,
+    "fp32_gdn_single_state_bytes_per_sequence": 150994944,
+    "partial_nvfp4a16_ideal_tensor_bytes": 28551555040.0,
+    "partial_nvfp4a16_assumption": "仅64层dense FFN和16层全注意力线性投影按每权重4bit+每16权重1字节scale计算；其余维持原始字节；排除运行时重排、额外scale、文件头、额外缓存和kernel开销。"
+  }
+}

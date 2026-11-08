@@ -1,117 +1,66 @@
 # CPT-SFT：Qwen 训练、推理与模型研究
 
-本仓库整理两条独立工作线：
+整理 Qwen3.5-27B 多阶段 LoRA SFT、35B-A3B 的 QSA/Muon 架构实验，以及 Qwen3.8-Flash-Next / Qwen3.5-27B 的训练与推理入口。
 
-- **H200 × 8 架构改造实验**：仓库根目录的 Qwen3.5-35B-A3B QSA 移植、CPT、SFT 和推理方案，具体环境与假设见下方原有说明。
-- **B300 / RTX PRO 6000 推理及微调准备**：[Inference](Inference/README.md) 包含 Qwen3.8-Flash-Next 和 Qwen3.5-27B 的 vLLM 0.32.0 启动脚本、MS-SWIFT 训练脚本与测试工具；[训练说明](Inference/TRAINING.md) 和 [模型与量化指南](Inference/Model_Guide/README.md) 分别介绍适用条件、架构、FP8/NVFP4 与 PLE。
-- **环境与专项报告**：[CUDA/PyTorch 环境](cuda13_pytorch_notes.md)、[H200 环境脚本](scripts/env/)、[Qwen3.5 多模态训练与量化报告](qwen3_5_jev_multimodal_training_and_quantization_report.md)。
+整个 `CPT-SFT/` 是一个 Git 仓库，对应 [qianlvguang/CPT-SFT](https://github.com/qianlvguang/CPT-SFT)。按用途分类，再在训练目录内区分模型和方案；模型权重、数据集、虚拟环境和运行产物单独存放。
 
-这两条工作线对应不同模型、硬件、框架与并行方案，不应直接混用脚本或 checkpoint。新增 B300/RTX 脚本和量化研究尚未在目标硬件验证；先检查版本、权重、显存与依赖，再进行小规模测试。Flash-Next 的 router/expert 分层选择需要核对真实模块；新增训练脚本尚不支持在同一次训练中为各层、router 和 expert 分别指定学习率或 LoRA rank。
+## 目录
 
----
+```text
+CPT-SFT/
+├── training/
+│   ├── qwen35_27b/          # H200×8，V1～V4 累计 LoRA 推荐路线
+│   │   └── legacy/          # 历史训练与 sweep 脚本，保留原始内容
+│   ├── qsa_muon_35b_a3b/    # H200×8，QSA 预热、CPT、SFT 与插件
+│   ├── swift/               # B300 Flash-Next 与单卡 27B 微调入口
+│   └── domain_adaptation/   # 法规/文章/Wiki CPT、QA 合成、引用风格方案
+├── inference/               # vLLM / SGLang 服务脚本
+├── environment/             # H200 依赖、CUDA/PyTorch 说明及环境脚本
+├── docs/
+│   ├── model_guide/         # 模型结构、FP8/NVFP4、PLE 与权重检查
+│   ├── research_snapshots/  # 官方来源 revision、配置字段与内存推导
+│   ├── reports/             # JEV 多模态训练与量化方案报告
+│   ├── training_plans/      # 领域 CPT、推理制 QA、严谨引用风格 SFT
+│   └── history/             # 历史实验记录
+├── tools/                   # 权重头部读取、模块正则检查
+└── tests/                   # 调度回归测试、在线服务冒烟客户端
+```
 
-# Qwen3.5-35B-A3B × QSA + Muon：CPT 能力重建与 SFT/推理全栈方案
+## 按任务选择入口
 
-本仓库提供将 **Qwen3.8-Flash-Next（`qwen4_exp`）的 QSA（Qwen Sparse Attention）** 移植替换至 **Qwen3.5-35B-A3B** 的 10 个全注意力层（`full_attention_interval = 4`），并切换为 **Muon 优化器（`dist_muon`）** 后的 **三阶段继续预训练（CPT）能力重建、后续 SFT 以及 vLLM / SGLang 极限推理优化**完整工程方案。
+| 任务 | 入口与说明 | 验证边界 |
+|---|---|---|
+| 27B 多阶段 SFT | [推荐路线](training/qwen35_27b/README.md)、[启动脚本](training/qwen35_27b/train_s1_s3_recommended.sh) | 调度器有标准库回归测试；推荐数据组合尚未完成 H200 实训验证 |
+| 35B-A3B QSA + Muon | [方案](docs/qsa_muon_35b_a3b.md)、[训练入口](training/qsa_muon_35b_a3b/run_cpt_sft_qsa_35a3_h200x8.sh) | 架构、算子与优化器需在目标环境验证 |
+| B300 / 单卡 27B 微调 | [MS-SWIFT 说明](training/swift/README.md) | 不同模型使用各自入口；目标硬件尚未验证 |
+| 领域知识与回答风格 | [CPT → QA → 风格总方案](docs/training_plans/README.md)、[配置与示例](training/domain_adaptation/README.md) | 法规/文章/Wiki 原文适配，推理生成 QA，目标为严谨详尽且有依据引用；未执行真实制数或训练 |
+| 在线推理 | [服务说明](inference/README.md)、[H200 QSA 服务](inference/serve_vllm_sglang_h200.sh) | B300/RTX 脚本固定 vLLM 0.32.0；实际权重与硬件需分别验证 |
+| 环境安装与检查 | [环境说明](environment/README.md) | 安装脚本按需运行，不随本地检查自动安装依赖 |
+| 模型与量化研究 | [模型指南](docs/model_guide/README.md)、[JEV 报告](docs/reports/qwen3_5_jev_multimodal_training_and_quantization_report.md) | 研究方案和报告中的估算不能视作实测结果 |
+| 历史复盘 | [训练进展日志](docs/history/progress_log.md)、[历史脚本](training/qwen35_27b/legacy/) | 日志中的远端路径、参数和评测保留历史含义 |
 
-硬件面向 **NVIDIA H200 (141GB HBM3e) × 8** 节点深度调优。
+这些方案对应不同模型、训练框架和并行配置。27B 推荐路线仍是 V1～V4 的一条固定配方；`legacy/` 中的 sweep 仅用于历史追溯。
 
-> **环境基线（2026-10 更新）**：CUDA 13.1 + `torch==2.14.1`（**cu130** 轮子）。
-> 官方轮子已内置 `sm_75 / sm_80 / sm_86 / sm_90 / sm_100 / sm_120` 的 SASS 并附带 PTX，
-> H200（sm_90）直接可用，**无需自行编译**；官方无 `cu131` 索引，且 `cu132/cu134`
-> 需要更高驱动，故 13.1 环境请选 **cu130**。
-> 详见 [cuda13_pytorch_notes.md](cuda13_pytorch_notes.md)。
+27B 的新增调研入口：[模型结构详解](docs/model_guide/qwen35_27b_architecture.md)、[量化方案与部署顺序](docs/model_guide/qwen35_27b_quantization.md)。其中明确区分官方 FP8 配置、NVFP4A16 工具示例、W4A4 的额外条件，以及自训模型尚待完成的验证。
 
----
+领域知识新增路线：[法规/文章/Wiki 原文 CPT](docs/training_plans/domain_cpt_plan.md) → [有证据的 QA 合成与 SFT](docs/training_plans/qa_synthesis_plan.md) → [严谨详尽、带依据引用的风格收尾](docs/training_plans/answer_style_sft_plan.md)。推理端同时保留可更新的检索来源，避免把引用外观当成引用正确。
 
-## 1. 核心问题诊断：为什么必须分阶段 CPT？
+训练与管理补充：[27B QAT/QLoRA、WSD 收尾、新 Megatron 支持及文件管理](docs/training_plans/qwen35_27b_advanced_training_and_management.md)。含原生配置与薄启动器设计示例，已核对官方 release 元数据，尚未实现新启动器或在目标 GPU 验证。
 
-### 1.1 架构手术前后的异同
-`Qwen3.5-35B-A3B` 共 40 层（`10 × (3 × Gated DeltaNet + 1 × Full Attention)`），`hidden_size = 2048`，256 个路由专家（Top-8 激活，`moe_intermediate_size = 512`）+ 1 个共享专家。将其中的 10 层 Full Attention 替换为 QSA 后：
+## 本地检查
 
-| 模块 | 替换前 (`Qwen3.5-35B-A3B`) | 替换后 (`35B-A3B-QSA`) | 权重继承与冷启动状态 |
-|---|---|---|---|
-| 线性注意力层 (30 层) | Gated DeltaNet (16 QK / 32 V, dim 128) | 保持不变 | 100% 继承 |
-| MoE 专家层 (40 层) | 256 路由专家 (Top-8) + 1 共享专家 | 保持不变 | 100% 继承 |
-| 全注意力主干 (10 层) | Gated Attention (16 Q / 2 KV, dim 256, 64 维 mRoPE) | QSA 主投影 (`q/k/v/o_proj`, `q/k_norm`) | **形状完全同构，100% 继承** |
-| **QSA 微块索引器 (10 层)** | ❌ 无 | **`self_attn.indexer`** (`index_qk_proj`, `q/k_layernorm`, 4Q/1KV, dim 128, ratio 4, budget 2048) | ⚠️ **全新冷启动 / 跨模型移植，分布未对齐** |
-| 优化器动力学 | AdamW 预训练收敛态 | **Muon (`dist_muon`) + AdamW 混合** | ⚠️ **无历史 Muon 动量缓冲，直接全参易震荡** |
-
-### 1.2 两大核心风险与对策
-1. **稀疏路由冷启动冲垮 MoE 与 GDN**：当序列长度 $> 2048$（`indexer_budget`）时，未对齐的 `indexer` 会挑出错误的 4-token 微块（micro-blocks）。若直接放开全模型训练，错误上下文产生的剧烈梯度会瞬间破坏后方 256 个专家的负载均衡与 GDN 的 `fp32` 递归状态。
-   - **对策**：先执行 **Stage 0（QSA 路由对齐预热）**，冻结 MoE 与 GDN，仅训 `indexer`（或 10 层 QSA），并支持直接用原 35B-A3B 冻结 Q/K 的微块注意力分布做 **前向 KL 自蒸馏**（[`compute_qsa_indexer_self_kl_loss`](mcore_qsa_bridge_and_distill_plugin.py)），5~10 倍加速收敛。
-2. **Muon 正交化误伤 Router 与 Indexer**：Muon 通过 Newton-Schulz 迭代对 2D 动量矩阵做正交化更新，**绝对不能用于非内部特征变换矩阵**。
-   - **对策**：通过插件 [`qsa_muon_plugin.py`](qsa_muon_plugin.py) 在优化器创建前强制拦截，确保 **Embedding、`lm_head`、1D Norm、GDN 递归参数（`A_log`/`dt_bias`/`conv1d`）、MoE Router（`mlp.gate`）以及 QSA Indexer（`self_attn.indexer`）全部回退至 AdamW**，仅对内部 2D 线性层应用 `dist_muon`。
-
----
-
-## 2. 三阶段训练路线总览（Warmup $\to$ CPT $\to$ SFT）
-
-| 阶段 | 脚本模式 | 训练参数范围 | 优化器与学习率 | 序列长度与预算课程 | 目标 |
-|---|---|---|---|---|---|
-| **Stage 0** | `warmup` | 仅 `self_attn.indexer` 或 10 层 QSA `self_attn`（冻结 GDN / MoE / ViT） | `adam`, `lr=5e-4 -> 5e-5`, warmup `5%` | `16384`，约 `1B~2B` tokens | 对齐微块路由打分，支持免外部 Teacher 的前向 KL 自蒸馏 |
-| **Stage 1** | `cpt` | LLM 全参（QSA + GDN + 256 MoE 专家）；默认冻结 ViT | `dist_muon` (2D) + `AdamW` (其余), `lr=1.5e-4 -> 1.5e-5`, warmup **`8%`**, `wd=0.1` | `16384 -> 32768`，预算 `4096 -> 2048` 退火，约 `10B~30B` tokens | 在 Muon 几何与稀疏注意力下重建 35B-A3B 的长程推理与知识容量 |
-| **Stage 2A** | `sft_full` | 全参微调 LLM + 专家；**冻结 ViT 与 MoE Router** | `dist_muon`, `lr=2e-5 -> 2e-6`, warmup `3%`, `wd=0.05` | `8192 / 16384`，课程数据 + 通用回放 | 高算力全参指令微调，冻结 Router 防止垂直领域专家坍缩 |
-| **Stage 2B** | `sft_lora` | 异构 LoRA (`all-linear`, `r64/a128`)；**冻结 Router** | `adam` / `dist_muon`, `lr=3e-5 -> 3e-6` | `8192`，支持 V1~V4 多阶段累计 Adapter | 轻量化低显存 SFT，防遗忘，无缝对接既有评测选档流水线 |
-
-> **⚠️ MTP 头维护提醒**：`Qwen3.5-35B-A3B` 含 1 层 MTP（`mtp_num_hidden_layers = 1`）。CPT/SFT 期间请保留或协同微调 `mtp.*` 权重，否则训后表征漂移会导致推理时 `NEXTN` 投机解码接受率大幅下降。
-
----
-
-## 3. H200 × 8 显卡利用率（MFU）最大化要点
-
-1. **并行切分避坑（`TP=1, EP=8, DP=8` 远优于 `TP=4`）**
-   - `35B-A3B` 的 `num_key_value_heads = 2`，QSA 的 `indexer_kv_heads = 1`。若盲目沿用 27B Dense 的 `TP=4`，会导致 KV 头无法整除 `TP` 报错或被迫复制 KV 头；且 `hidden_size = 2048`、`moe_intermediate_size = 512` 较窄，`TP=4` 会使单卡 GEMM 过碎。
-   - **最佳配置**：`TP=1, EP=8, DP=8`（256 个专家均分到 8 张 H200，每卡 32 个专家，无 TP 通信开销）。超长上下文（$\ge 32\text{K}$）可设 `TP=2, EP=4, DP=4` 并开启 `sequence_parallel=true`。
-2. **MoE 与长序列算子全开**
-   - `--moe_grouped_gemm true`：合并每卡 32 个细粒度专家的矩阵乘，MoE 层提速 **2.5×~3.5×**。
-   - `--moe_shared_expert_overlap true`：共享专家计算与路由专家 All-to-All 通信重叠。
-   - `--packing true --padding_free true` + `--cross_entropy_loss_fusion true`：消除填充气泡并省去 `248,320` 词表 logits 显存峰值。
-   - `NCCL_NVLS_ENABLE=1`：启用 H200 NVLink SHARP 硬件集合通信加速。
-
----
-
-## 4. 推理引擎优化（vLLM & SGLang）
-
-脚本 [`serve_vllm_sglang_h200.sh`](serve_vllm_sglang_h200.sh) 集成了针对 `35B-A3B-QSA` 的全套推理优化：
-
-- **黄金并行度 `TP=2`**：完美契合 `num_key_value_heads = 2`（每卡 1 个 KV 头，**零 KV Cache 复制冗余**），2 张 H200 (282GB) 留出 **210+ GB** 供 128K~256K 上下文缓存；8 卡集群推荐 `DP=4 × TP=2` 或 `EP=8 + FP8`。
-- **混合三级缓存管理**：
-  - 30 层 GDN 递归状态强制 FP32（`--mamba-ssm-cache-dtype float32`），防止长文生成数值溢出；
-  - 10 层 QSA 主 KV Cache 支持 `--kv-cache-dtype fp8`；
-  - 10 层 QSA Paged Side-Cache（`key_pool` 4-token 微块压缩键池）常驻显存，128K 上下文 Decode 仅需访存 Top-512 微块（2048 tokens），**KV 访存削减 98.4%**。
-- **SGLang `NEXTN` 投机解码 + QSA 索引共享（Index-Sharing）**：
-  - 启用 `--speculative-algo NEXTN --speculative-num-steps 3 --speculative-num-draft-tokens 4`，利用 QSA 的 4-token 微块粒度，在验证草稿 token 时**复用同一次 QSA Indexer 选出的 Top-$B$ 微块集合**，使 Decode 吞吐再翻 **1.8×~2.4×**。
-
----
-
-## 5. 目录文件说明与快速启动
-
-| 文件 | 说明 |
-|---|---|
-| [`run_cpt_sft_qsa_35a3_h200x8.sh`](run_cpt_sft_qsa_35a3_h200x8.sh) | H200×8 训练主入口，支持 `warmup` / `cpt` / `sft_full` / `sft_lora`、10 步冒烟 `SMOKE=1` 及 `BACKEND=megatron\|hf` 切换 |
-| [`qsa_muon_plugin.py`](qsa_muon_plugin.py) | 核心插件：Muon/AdamW 参数分组护栏、分阶段冻结控制、严格数据预处理与分通道 Loss |
-| [`mcore_qsa_bridge_and_distill_plugin.py`](mcore_qsa_bridge_and_distill_plugin.py) | 进阶插件：免外部 Teacher 的微块前向 KL 自蒸馏、动态稀疏预算课程、`mcore-bridge` 透传 |
-| [`serve_vllm_sglang_h200.sh`](serve_vllm_sglang_h200.sh) | 推理引擎一键服务脚本：含 `prepare_config` 配置补齐、`vllm`、`vllm_fp8_ep8`、`sglang` 模式 |
-| [`ds_zero2_h200.json`](ds_zero2_h200.json) | `BACKEND=hf` 模式下的 DeepSpeed ZeRO-2 通信重叠配置 |
-| [`requirements_h200.txt`](requirements_h200.txt) | H200×8 训练与推理配套依赖清单（现行基线：CUDA 13.1 + torch 2.14.1） |
-| [`cuda13_pytorch_notes.md`](cuda13_pytorch_notes.md) | CUDA 13 / PyTorch 2.14.1 环境说明：架构支持（sm90/100/120）、CUDA 13.1 选型、源码编译资源清单、验证与常见坑 |
-| [`qwen3_5_jev_multimodal_training_and_quantization_report.md`](qwen3_5_jev_multimodal_training_and_quantization_report.md) | Qwen3.5 系列（27B Dense & 35B-A3B MoE）多模态 JEV 决策模型训练全栈方案与低比特量化（FP8/NVFP4）深度报告 |
-| [`scripts/env/`](scripts/env/) | 环境脚本：`install_official.sh`（一键装 cu130 轮子）、`verify_arch.sh`（验证/离线检查 whl）、`build_from_source.sh`（自编译骨架） |
-
-### 快速运行示例
+以下命令从仓库根目录执行，不启动 GPU 训练或下载模型：
 
 ```bash
-# 1. 10 步冒烟测试（验证环境、算子挂载、Muon 分组日志与显存峰值）
-SMOKE=1 bash run_cpt_sft_qsa_35a3_h200x8.sh warmup
-SMOKE=1 bash run_cpt_sft_qsa_35a3_h200x8.sh cpt
-
-# 2. 依次执行 Stage 0 (路由预热) -> Stage 1 (Muon CPT) -> Stage 2 (SFT)
-bash run_cpt_sft_qsa_35a3_h200x8.sh warmup
-MODEL_PATH=/path/to/warmup_ckpt bash run_cpt_sft_qsa_35a3_h200x8.sh cpt
-MODEL_PATH=/path/to/cpt_ckpt    bash run_cpt_sft_qsa_35a3_h200x8.sh sft_full
-
-# 3. 补齐推理配置并启动 SGLang / vLLM 服务
-MODEL_PATH=/path/to/sft_ckpt bash serve_vllm_sglang_h200.sh prepare_config
-MODEL_PATH=/path/to/sft_ckpt bash serve_vllm_sglang_h200.sh sglang
+python3 tests/test_recommended_pipeline.py
+bash training/qwen35_27b/train_s1_s3_recommended.sh plan
+DATASET=training/swift/example_sft.jsonl DRY_RUN=1 bash training/swift/train_qwen35_27b_swift.sh
+DATASET=training/swift/example_sft.jsonl DRY_RUN=1 bash training/swift/train_b300_swift.sh
+DRY_RUN=1 bash inference/serve_qwen35_27b.sh
 ```
+
+推理启动脚本的 dry-run 仍会创建缓存和模型目录，可通过 `HF_CACHE`、`MODEL_DIR` 指定位置。连接真实服务的客户端位于 [tests/smoke_test.py](tests/smoke_test.py)，需等目标服务启动后另行运行。
+
+## 目录迁移
+
+2026-11-08 将原嵌套仓库提升到整个 `CPT-SFT/`，保留原有 Git 提交历史，并将父目录的 27B 脚本纳入同一工作树。新旧路径对照见 [目录迁移说明](docs/repository_layout.md)。

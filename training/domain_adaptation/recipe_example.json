@@ -1,0 +1,96 @@
+{
+  "status": "proposal_not_gpu_validated",
+  "checked_on": "2026-11-08",
+  "examples_are_training_data": false,
+  "scope": "原生 Qwen3.5-27B；独立于原有视觉 V1～V4 与 QSA/Muon 工作线。",
+  "base_model": {
+    "id": "Qwen/Qwen3.5-27B",
+    "revision": "fc05daec18b0a78c049392ed2e771dde82bdf654",
+    "dtype": "bfloat16"
+  },
+  "style": {
+    "id": "rigorous_detailed_cited_v1",
+    "user_confirmed": true,
+    "language": "zh",
+    "description": "严谨详尽，带依据引用；证据不足时明确具体缺口。"
+  },
+  "data_split": {
+    "unit": "document_family",
+    "train": 0.96,
+    "validation": 0.02,
+    "test": 0.02,
+    "seed": 42,
+    "separate_temporal_test": true
+  },
+  "cpt": {
+    "framework_entry": "megatron pt",
+    "train_scope": "language backbone and lm_head; freeze vision/merger; record MTP behavior",
+    "optimizer": "adamw",
+    "peak_lr": 1e-05,
+    "min_lr": 1e-06,
+    "scheduler": "cosine",
+    "warmup_fraction": 0.03,
+    "weight_decay": 0.1,
+    "gradient_clip": 1.0,
+    "max_length": 8192,
+    "token_budget_cap": 100000000,
+    "max_passes_per_source": 1,
+    "mixture_unit": "non_padding_tokens",
+    "mixture": {
+      "law": 0.32,
+      "article": 0.24,
+      "wiki": 0.24,
+      "general_replay": 0.2
+    },
+    "hardware_assumption": "8 x H200",
+    "parallelism_proposal": {
+      "tp": 4,
+      "pp": 1,
+      "cp": 1,
+      "dp": 2,
+      "micro_batch_size": 1,
+      "global_batch_size": 32
+    },
+    "packing": "enable only after verifying sample attention boundaries in the exact backend"
+  },
+  "qa_synthesis": {
+    "training_chunks": 5000,
+    "max_candidates_per_chunk": 2,
+    "teacher_model_id": null,
+    "teacher_revision": null,
+    "independent_verifier_required": true,
+    "manual_audit_start": 200,
+    "evaluation_source_families_must_be_excluded": true
+  },
+  "qa_sft": {
+    "target_scope": "verified language linear modules only",
+    "lora_rank": 32,
+    "lora_alpha": 64,
+    "lora_dropout": 0.05,
+    "lr": 2e-05,
+    "num_epochs": 1,
+    "max_length": 8192,
+    "supervision": "assistant_only",
+    "freeze_vision": true,
+    "freeze_merger": true
+  },
+  "style_sft": {
+    "continue_same_adapter": true,
+    "reset_optimizer_scheduler": true,
+    "human_calibrated_style_samples_target": 2000,
+    "sampling_unit": "assistant_supervised_tokens",
+    "mixture": {
+      "style": 0.7,
+      "verified_qa_replay": 0.3
+    },
+    "lr": 5e-06,
+    "num_epochs": 1,
+    "max_length": 8192,
+    "blind_evaluation_questions_min": 300
+  },
+  "deployment": {
+    "retrieval_evidence_required_for_verifiable_citations": true,
+    "citation_url_mapping": "backend_source_manifest",
+    "quantization_after_quality_evaluation": true
+  }
+}
