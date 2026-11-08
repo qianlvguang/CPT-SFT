@@ -1,3 +1,15 @@
+# CPT-SFT：Qwen 训练、推理与模型研究
+
+本仓库整理两条独立工作线：
+
+- **H200 × 8 架构改造实验**：仓库根目录的 Qwen3.5-35B-A3B QSA 移植、CPT、SFT 和推理方案，具体环境与假设见下方原有说明。
+- **B300 / RTX PRO 6000 推理及微调准备**：[Inference](Inference/README.md) 包含 Qwen3.8-Flash-Next 和 Qwen3.5-27B 的 vLLM 0.32.0 启动脚本、MS-SWIFT 训练脚本与测试工具；[训练说明](Inference/TRAINING.md) 和 [模型与量化指南](Inference/Model_Guide/README.md) 分别介绍适用条件、架构、FP8/NVFP4 与 PLE。
+- **环境与专项报告**：[CUDA/PyTorch 环境](cuda13_pytorch_notes.md)、[H200 环境脚本](scripts/env/)、[Qwen3.5 多模态训练与量化报告](qwen3_5_jev_multimodal_training_and_quantization_report.md)。
+
+这两条工作线对应不同模型、硬件、框架与并行方案，不应直接混用脚本或 checkpoint。新增 B300/RTX 脚本和量化研究尚未在目标硬件验证；先检查版本、权重、显存与依赖，再进行小规模测试。Flash-Next 的 router/expert 分层选择需要核对真实模块；新增训练脚本尚不支持在同一次训练中为各层、router 和 expert 分别指定学习率或 LoRA rank。
+
+---
+
 # Qwen3.5-35B-A3B × QSA + Muon：CPT 能力重建与 SFT/推理全栈方案
 
 本仓库提供将 **Qwen3.8-Flash-Next（`qwen4_exp`）的 QSA（Qwen Sparse Attention）** 移植替换至 **Qwen3.5-35B-A3B** 的 10 个全注意力层（`full_attention_interval = 4`），并切换为 **Muon 优化器（`dist_muon`）** 后的 **三阶段继续预训练（CPT）能力重建、后续 SFT 以及 vLLM / SGLang 极限推理优化**完整工程方案。

@@ -1,0 +1,2 @@
+{"messages":[{"role":"user","content":"什么是机器学习？"},{"role":"assistant","content":"机器学习是让计算机从数据中学习规律，并利用这些规律完成预测或决策的方法。"}]}
+{"messages":[{"role":"system","content":"请简洁地回答问题。"},{"role":"user","content":"什么是监督学习？"},{"role":"assistant","content":"监督学习使用带标签的数据训练模型，使其学会从输入预测目标输出。"}]}
