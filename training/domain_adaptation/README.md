@@ -13,5 +13,6 @@
 | 风格 SFT 格式示例 | [style_sft_example.jsonl](examples/style_sft_example.jsonl) |
 | 来源映射示例 | [sample_provenance_example.jsonl](examples/sample_provenance_example.jsonl) |
 | 生成与验证提示词 | [QA 生成](prompts/qa_generate.md)、[QA 验真](prompts/qa_verify.md)、[风格改写](prompts/style_rewrite.md) |
+| Montessori-Instruct 合成管线 | [montessori/README.md](montessori/README.md)（探索采样 + 单步 Loss 差分探针 + Teacher DPO 对齐） |
 
 示例正文是“教学合成规则”，并非真实法规；示例中没有伪造真实法律出处。JSONL 每行是一条记录，训练文本与审计元数据分别存放。正式执行前需补充真实来源、冻结数据 manifest、核对精确软件版本，并完成数据与 label 预检。

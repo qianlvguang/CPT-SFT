@@ -33,7 +33,7 @@ CPT-SFT/
 | 27B 多阶段 SFT | [推荐路线](training/qwen35_27b/README.md)、[启动脚本](training/qwen35_27b/train_s1_s3_recommended.sh) | 调度器有标准库回归测试；推荐数据组合尚未完成 H200 实训验证 |
 | 35B-A3B QSA + Muon | [方案](docs/qsa_muon_35b_a3b.md)、[训练入口](training/qsa_muon_35b_a3b/run_cpt_sft_qsa_35a3_h200x8.sh) | 架构、算子与优化器需在目标环境验证 |
 | B300 / 单卡 27B 微调 | [MS-SWIFT 说明](training/swift/README.md) | 不同模型使用各自入口；目标硬件尚未验证 |
-| 领域知识与回答风格 | [CPT → QA → 风格总方案](docs/training_plans/README.md)、[配置与示例](training/domain_adaptation/README.md) | 法规/文章/Wiki 原文适配，推理生成 QA，目标为严谨详尽且有依据引用；未执行真实制数或训练 |
+| 领域知识与回答风格 | [CPT → QA → 风格总方案](docs/training_plans/README.md)、[配置与示例](training/domain_adaptation/README.md)、[Montessori-Instruct 管线](training/domain_adaptation/montessori/README.md) | 法规/文章/Wiki 原文适配，含单步 Loss 差分探针与 Teacher DPO 反向对齐管线（已通过本地单元测试与 dry-run） |
 | 在线推理 | [服务说明](inference/README.md)、[H200 QSA 服务](inference/serve_vllm_sglang_h200.sh) | B300/RTX 脚本固定 vLLM 0.32.0；实际权重与硬件需分别验证 |
 | 环境安装与检查 | [环境说明](environment/README.md) | 安装脚本按需运行，不随本地检查自动安装依赖 |
 | 模型与量化研究 | [模型指南](docs/model_guide/README.md)、[JEV 报告](docs/reports/qwen3_5_jev_multimodal_training_and_quantization_report.md) | 研究方案和报告中的估算不能视作实测结果 |
@@ -53,7 +53,9 @@ CPT-SFT/
 
 ```bash
 python3 tests/test_recommended_pipeline.py
+python3 tests/test_montessori_pipeline.py
 bash training/qwen35_27b/train_s1_s3_recommended.sh plan
+DRY_RUN=1 bash training/domain_adaptation/montessori/run_montessori_pipeline.sh
 DATASET=training/swift/example_sft.jsonl DRY_RUN=1 bash training/swift/train_qwen35_27b_swift.sh
 DATASET=training/swift/example_sft.jsonl DRY_RUN=1 bash training/swift/train_b300_swift.sh
 DRY_RUN=1 bash inference/serve_qwen35_27b.sh

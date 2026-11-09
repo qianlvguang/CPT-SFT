@@ -76,3 +76,11 @@
 生成 QA 只使用训练 split。验证/测试问题来自独立文档族与人工/独立流程，不能把训练题改几个词当成测试。引用质量至少分别报告正确性、支持覆盖和答案正确性，不把“出现 `[S1]`”当作引用得分。[ALCE 引用评测](https://arxiv.org/abs/2305.14627)
 
 配套提示词：[生成](../../training/domain_adaptation/prompts/qa_generate.md)、[验真](../../training/domain_adaptation/prompts/qa_verify.md)、[风格改写](../../training/domain_adaptation/prompts/style_rewrite.md)。
+
+## 8. Montessori-Instruct 教师反向对齐扩展（Student-Aware QA Synthesis）
+
+针对传统 Teacher 盲目生成导致“信息密度与 Student 吸收能力错配”的问题，在 [`training/domain_adaptation/montessori/`](../../training/domain_adaptation/montessori/README.md) 中落地了基于 **Montessori-Instruct (ICLR 2025)** 的闭环合成管线：
+
+1. **探索生成与程序硬核验**（[`probing_generate.py`](../../training/domain_adaptation/montessori/probing_generate.py)）：对每个训练原文块采样 $K$ 条候选问答，强制执行引用 Key 存在性与原文 `quote` 精确子串偏移核验。
+2. **局部数据影响探针**（[`influence_scorer.py`](../../training/domain_adaptation/montessori/influence_scorer.py)）：在独立验证集 $\mathcal{D}_{\text{ref}}$ 上计算 Student 单步梯度更新前后的 Loss 差分 $\mathcal{I}(x_i, y_i; \mathcal{D}_{\text{ref}}) = \mathcal{L}(\mathcal{D}_{\text{ref}} \mid \theta) - \mathcal{L}(\mathcal{D}_{\text{ref}} \mid \theta - \eta \nabla_\theta \mathcal{L}(x_i, y_i \mid \theta))$（同时支持一阶梯度内积 `grad_dot`）。
+3. **偏好对构建与 Teacher DPO**（[`build_dpo_pairs.py`](../../training/domain_adaptation/montessori/build_dpo_pairs.py) + [`train_teacher_dpo_swift.sh`](../../training/domain_adaptation/montessori/train_teacher_dpo_swift.sh)）：仅将通过程序核验且 $\mathcal{I} > 0$ 的样本作为正例 $x^+$，与同源负影响样本 $x^-$ 组成偏好对，通过 MS-SWIFT DPO 反向调整 Teacher 的生成分布。
