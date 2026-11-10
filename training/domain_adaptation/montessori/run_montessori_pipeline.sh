@@ -32,7 +32,7 @@ TEACHER_DPO_JSONL="$WORK_DIR/teacher_dpo_pairs.jsonl"
 STUDENT_SFT_JSONL="$WORK_DIR/student_sft_messages.jsonl"
 PROVENANCE_JSONL="$WORK_DIR/student_sft_provenance.jsonl"
 
-echo "=== [1/5] Generating Probing QA Candidates (mode=$MODE, K=$NUM_CANDIDATES) ==="
+echo "=== [1/6] Generating Probing QA Candidates (mode=$MODE, K=$NUM_CANDIDATES) ==="
 python3 "$SCRIPT_DIR/probing_generate.py" \
   --sources "$SOURCES" \
   --prompt-template "$PROMPT_TEMPLATE" \
@@ -40,7 +40,7 @@ python3 "$SCRIPT_DIR/probing_generate.py" \
   --num-candidates "$NUM_CANDIDATES" \
   --mode "$MODE"
 
-echo "=== [2/5] Scoring Local Data Influence on Student (backend=$INFLUENCE_BACKEND, method=$INFLUENCE_METHOD) ==="
+echo "=== [2/6] Scoring Local Data Influence on Student (backend=$INFLUENCE_BACKEND, method=$INFLUENCE_METHOD) ==="
 python3 "$SCRIPT_DIR/influence_scorer.py" \
   --candidates "$PROBING_JSONL" \
   --ref-dataset "$REF_DATASET" \
@@ -49,18 +49,25 @@ python3 "$SCRIPT_DIR/influence_scorer.py" \
   --method "$INFLUENCE_METHOD" \
   --probe-lr "$PROBE_LR"
 
-echo "=== [3/5] Building Teacher DPO Pairs & Student SFT Dataset ==="
+echo "=== [3/6] Building Teacher DPO Pairs & Student SFT Dataset ==="
 python3 "$SCRIPT_DIR/build_dpo_pairs.py" \
   --scored-candidates "$SCORED_JSONL" \
   --dpo-output "$TEACHER_DPO_JSONL" \
   --sft-output "$STUDENT_SFT_JSONL" \
   --provenance-output "$PROVENANCE_JSONL"
 
-echo "=== [4/5] Teacher DPO Alignment (MS-SWIFT, DRY_RUN=$DRY_RUN) ==="
+echo "=== [4/6] Synthesizing API Black-Box Steering Prompts & Multi-Format Student Preference Data (DPO/KTO/GRPO) ==="
+python3 "$SCRIPT_DIR/api_preference_synthesizer.py" \
+  --sources "$SOURCES" \
+  --scored-candidates "$SCORED_JSONL" \
+  --prompt-template "$PROMPT_TEMPLATE" \
+  --output-dir "$WORK_DIR/api_preference"
+
+echo "=== [5/6] Teacher DPO Alignment (MS-SWIFT, DRY_RUN=$DRY_RUN) ==="
 DATASET="$TEACHER_DPO_JSONL" OUTPUT_DIR="$WORK_DIR/teacher_dpo_ckpt" DRY_RUN="$DRY_RUN" \
   bash "$SCRIPT_DIR/train_teacher_dpo_swift.sh"
 
-echo "=== [5/5] Student SFT on High-Influence Data (MS-SWIFT, DRY_RUN=$DRY_RUN) ==="
+echo "=== [6/6] Student SFT on High-Influence Data (MS-SWIFT, DRY_RUN=$DRY_RUN) ==="
 DATASET="$STUDENT_SFT_JSONL" OUTPUT_DIR="$WORK_DIR/student_sft_ckpt" DRY_RUN="$DRY_RUN" \
   bash "$SWIFT_DIR/train_qwen35_27b_swift.sh"
 

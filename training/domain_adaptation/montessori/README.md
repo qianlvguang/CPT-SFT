@@ -55,8 +55,9 @@ $$\mathcal{I}(x_i, y_i; \mathcal{D}_{\text{ref}}) \approx \eta \left\langle \nab
 | [`probing_generate.py`](probing_generate.py) | Stage 1 | 读取 `source_documents` JSONL，渲染 [`prompts/qa_generate.md`](../prompts/qa_generate.md)，调用 vLLM（或 `mock`）对每个原文块采样 $K$ 条候选 QA，并执行**程序级引用 Key、原文精确子串偏移（`start_char`/`end_char`）与 SHA256 核验** |
 | [`influence_scorer.py`](influence_scorer.py) | Stage 2 | 计算每条候选 QA 对 Student 在独立验证集 $\mathcal{D}_{\text{ref}}$ 上的局部影响得分 $\mathcal{I}(x, y; \mathcal{D}_{\text{ref}})$，支持 `one_step_loss_diff` 与 `grad_dot` |
 | [`build_dpo_pairs.py`](build_dpo_pairs.py) | Stage 3 | 按 `prompt_group_id` 聚合同一原文块的探测候选，配对正影响样本 $x^+$ 与负影响样本 $x^-$ 导出 MS-SWIFT DPO 训练集，同时导出高影响 Student SFT 数据集与来源溯源清单 |
-| [`train_teacher_dpo_swift.sh`](train_teacher_dpo_swift.sh) | Stage 4 | 基于 `swift rlhf --rlhf_type dpo` 的 Teacher LoRA DPO 训练启动脚本（支持 `DRY_RUN=1` 预检与 RPO 正则项 `--rpo_alpha`） |
-| [`run_montessori_pipeline.sh`](run_montessori_pipeline.sh) | Stage 1–5 | 端到端串联脚本：探索生成 → 影响打分 → DPO/SFT 数据构建 → Teacher DPO → Student SFT |
+| [`api_preference_synthesizer.py`](api_preference_synthesizer.py) | Stage 4 (API 闭源/多维偏好) | **黑盒 API 教师对齐 + 学生多维偏好合成器**：<br>① 构建分层偏好记忆库 `PreferenceMemoryBank`，输出 **In-Context 对比引导提示词（ICDPO）** 与 **元规则进化补丁（Meta-Prompt Rubric）**；<br>② 融合局部数据影响、程序硬核验与长度校准计算复合奖励 $R(x,y)$，一键导出 **Student DPO**（含负例缺陷归因标签）、**Student KTO**（100% 利用非配对采样）与 **Student GRPO/RLVR** 数据集 |
+| [`train_teacher_dpo_swift.sh`](train_teacher_dpo_swift.sh) | Stage 5 | 基于 `swift rlhf --rlhf_type dpo` 的 Teacher LoRA DPO 训练启动脚本（支持 `DRY_RUN=1` 预检与 RPO 正则项 `--rpo_alpha`） |
+| [`run_montessori_pipeline.sh`](run_montessori_pipeline.sh) | Stage 1–6 | 端到端串联脚本：探索生成 → 影响打分 → Teacher DPO/SFT 构建 → API 对比引导与多格式偏好导出 → Teacher DPO → Student SFT |
 
 ---
 

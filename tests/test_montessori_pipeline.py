@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MONTESSORI_DIR = REPO_ROOT / "training" / "domain_adaptation" / "montessori"
 sys.path.insert(0, str(MONTESSORI_DIR))
 
+import api_preference_synthesizer  # noqa: E402
 import build_dpo_pairs  # noqa: E402
 import influence_scorer  # noqa: E402
 import probing_generate  # noqa: E402
@@ -128,6 +129,54 @@ class MontessoriPipelineTests(unittest.TestCase):
             self.assertIn("swift sft --model", proc.stdout)
             self.assertTrue((Path(tmp) / "teacher_dpo_pairs.jsonl").exists())
             self.assertTrue((Path(tmp) / "student_sft_messages.jsonl").exists())
+            self.assertTrue((Path(tmp) / "api_preference" / "student_dpo_pairs.jsonl").exists())
+            self.assertTrue((Path(tmp) / "api_preference" / "student_kto_dataset.jsonl").exists())
+            self.assertTrue((Path(tmp) / "api_preference" / "student_grpo_prompts.jsonl").exists())
+            self.assertTrue((Path(tmp) / "api_preference" / "api_steered_prompt_example.txt").exists())
+
+    def test_api_blackbox_steering_and_multiformat_preference_export(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            probing_path = tmp_dir / "probing.jsonl"
+            scored_path = tmp_dir / "scored.jsonl"
+            api_out = tmp_dir / "api_out"
+
+            probing_generate.run_probing_generation(
+                sources_path=self.sources_path,
+                prompt_template_path=self.prompt_path,
+                output_path=probing_path,
+                num_candidates_per_source=4,
+                mode="mock",
+            )
+            influence_scorer.run_influence_scoring(
+                candidates_path=probing_path,
+                ref_dataset_path=self.ref_path,
+                output_path=scored_path,
+                backend="mock",
+                method="one_step_loss_diff",
+                probe_lr=1e-4,
+            )
+            summary = api_preference_synthesizer.run_api_preference_synthesizer(
+                sources_path=self.sources_path,
+                scored_candidates_path=scored_path,
+                prompt_template_path=self.prompt_path,
+                output_dir=api_out,
+            )
+            self.assertGreaterEqual(summary["api_alignment"]["memory_bank_size"], 1)
+            exports = summary["student_preference_exports"]
+            self.assertGreaterEqual(exports["student_dpo_pairs_count"], 1)
+            self.assertEqual(exports["student_kto_rows_count"], 4)
+            self.assertEqual(exports["student_grpo_prompts_count"], 1)
+
+            steered_text = (api_out / "api_steered_prompt_example.txt").read_text(encoding="utf-8")
+            self.assertIn("In-Context Contrastive Steering", steered_text)
+            self.assertIn("正向高收益生成", steered_text)
+            self.assertIn("负向受损生成", steered_text)
+
+            kto_rows = probing_generate.load_jsonl(api_out / "student_kto_dataset.jsonl")
+            labels = [r["label"] for r in kto_rows]
+            self.assertIn(True, labels)
+            self.assertIn(False, labels)
 
 
 if __name__ == "__main__":
