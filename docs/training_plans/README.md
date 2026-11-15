@@ -18,6 +18,7 @@ flowchart TD
 | 方案 | 解决什么问题 |
 |---|---|
 | [原文 CPT](domain_cpt_plan.md) | 法规、文章、Wiki 如何整理、混合、分词、训练及评测 |
+| [B300 双模型多模态 Wiki+RAG CPT](b300_multimodal_wiki_rag_cpt_plan.md) | B300 上 27B vs Flash-Next 训练可行性评估、Qwen-Image 2.1 生图/反事实、6 通道配比与 WSD 启动入口 |
 | [推理生成 QA](qa_synthesis_plan.md) | 如何从来源生成题目、作答、验证与导出 SFT 数据 |
 | [回答风格 SFT](answer_style_sft_plan.md) | 如何学习详尽且有引用的回答，而非只增加字数或引用外观 |
 | [27B 进阶训练与管理](qwen35_27b_advanced_training_and_management.md) | QAT/QLoRA、WSD 末期降 LR、新 Megatron 支持、原生配置与文件/产物管理 |

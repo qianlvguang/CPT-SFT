@@ -1,0 +1,30 @@
+{
+  "tuner_type": "lora",
+  "torch_dtype": "bfloat16",
+  "freeze_llm": false,
+  "freeze_vit": true,
+  "freeze_aligner": false,
+  "lora_rank": 64,
+  "lora_alpha": 128,
+  "lora_dropout": 0.05,
+  "target_modules": [
+    "all-linear"
+  ],
+  "max_length": 16384,
+  "truncation_strategy": "delete",
+  "strict": true,
+  "packing": true,
+  "padding_free": true,
+  "enable_channel_loss": true,
+  "attn_impl": "flash_attn",
+  "per_device_train_batch_size": 1,
+  "gradient_accumulation_steps": 8,
+  "learning_rate": 2e-05,
+  "aligner_lr": 5e-06,
+  "lr_scheduler_type": "cosine",
+  "warmup_ratio": 0.03,
+  "weight_decay": 0.1,
+  "max_grad_norm": 1.0,
+  "gradient_checkpointing": true,
+  "num_train_epochs": 1
+}

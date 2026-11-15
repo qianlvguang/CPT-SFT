@@ -1,6 +1,10 @@
-# B300：MS-SWIFT Megatron LoRA SFT
+# B300：MS-SWIFT 训练入口（Flash-Next SFT & 27B CPT/SFT）
 
-Qwen3.5-27B 是稠密模型，请使用独立的 [train_qwen35_27b_swift.sh](train_qwen35_27b_swift.sh)，用法和架构差异见 [Qwen3.5-27B 专项说明](../../docs/model_guide/qwen35_27b.md)。不要把本页 Flash-Next 的 router、expert、PLE 和 Megatron 并行配置套用于 27B。
+Qwen3.5-27B 是稠密模型：
+- 监督微调请使用 [train_qwen35_27b_swift.sh](train_qwen35_27b_swift.sh)；
+- **B300 8 卡多模态 Wiki/Logo/RAG WSD CPT** 请使用 [train_qwen35_27b_cpt_b300.sh](train_qwen35_27b_cpt_b300.sh)（支持 `BACKEND=megatron|swift`、`TUNER_TYPE=lora|full`、`LORA_SCOPE=all_linear|deep_mlp_regex`、`SMOKE=1` 与 `DRY_RUN=1`，配套方案见 [B300 多模态 Wiki+RAG CPT 方案](../../docs/training_plans/b300_multimodal_wiki_rag_cpt_plan.md)）。
+
+用法和架构差异见 [Qwen3.5-27B 专项说明](../../docs/model_guide/qwen35_27b.md)。不要把本页 Flash-Next 的 router、expert、PLE 和 Megatron 并行配置套用于 27B。
 
 `train_b300_swift.sh` 基于 MS-SWIFT 的 Qwen3.8-Flash-Next 专用 Megatron SFT 示例，使用原始 BF16 权重，进行文本监督微调（LoRA）。保持现有 **MS-SWIFT 4.7.0.dev** 环境，不会自动安装、升级软件或下载模型以外的依赖。该配置假设单机 **8 张 B300**；实际 GPU 数、显存、CPU RAM 与互联不同，需重新设计并验证并行配置，不要只修改 `NPROC_PER_NODE`。
 
