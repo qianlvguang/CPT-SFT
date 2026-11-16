@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Unit and integration tests for the Refactored V1-V4 -> CPT & Unified QA-SFT Pipeline."""
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DOMAIN_DIR = REPO_ROOT / "training" / "domain_adaptation"
+SWIFT_DIR = REPO_ROOT / "training" / "swift"
+sys.path.insert(0, str(DOMAIN_DIR))
+
+import build_mm_wiki_cpt as cpt_builder  # noqa: E402
+import refactor_v1_v4_pipeline as router  # noqa: E402
+
+
+class UnifiedV1V4PipelineTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.v1_v4_sample = DOMAIN_DIR / "examples" / "v1_v4_legacy_sample.jsonl"
+        self.new_qa_sample = DOMAIN_DIR / "examples" / "style_sft_example.jsonl"
+        self.sft_cfg_path = DOMAIN_DIR / "configs" / "sft_27b_unified_v1_v4_qa_b300.json"
+        self.unified_script = SWIFT_DIR / "run_unified_b300_pipeline.sh"
+
+    def test_ternary_key_keeps_v4_multi_image_and_rejects_cross_pool_leak(self) -> None:
+        raw_rows = [(r, self.v1_v4_sample) for r in cpt_builder.load_jsonl(self.v1_v4_sample)]
+        cleaned, report = router.validate_and_dedup_v1_v4(raw_rows)
+        self.assertEqual(report["validated_rows"], 8)
+        # v4_demo_001 appears twice with different cate_id and images; both must survive.
+        v4_001 = [r for r in cleaned if r["sample_id"] == "v4_demo_001"]
+        self.assertEqual(len(v4_001), 2)
+
+        # Cross-pool overlap on the exact ternary key must raise ValueError.
+        dup_cross_pool = dict(cleaned[0])
+        dup_cross_pool["pool"] = "final"
+        with self.assertRaisesRegex(ValueError, "Cross-pool overlap"):
+            router.validate_and_dedup_v1_v4(raw_rows + [(dup_cross_pool, None)])
+
+    def test_v4_final_requires_enable_thinking_false(self) -> None:
+        bad_v4_final = {
+            "sample_id": "v4_bad",
+            "cate_id": "kd",
+            "variant": 4,
+            "pool": "final",
+            "enable_thinking": True,
+            "images": ["a.jpg"],
+            "messages": [
+                {"role": "user", "content": "<image>\n描述"},
+                {"role": "assistant", "content": "结果"},
+            ],
+        }
+        with self.assertRaisesRegex(ValueError, "enable_thinking=false"):
+            router.validate_and_dedup_v1_v4([(bad_v4_final, None)])
+
+    def test_cpt_routing_filters_v2_and_final_and_upgrades_v4_rag(self) -> None:
+        raw_rows = [(r, self.v1_v4_sample) for r in cpt_builder.load_jsonl(self.v1_v4_sample)]
+        cleaned, _ = router.validate_and_dedup_v1_v4(raw_rows)
+        cpt_rows, summary = router.route_v1_v4_to_cpt(cleaned)
+
+        # In v1_v4_legacy_sample.jsonl:
+        # - 2 final rows (v1_demo_002, v4_demo_002) reserved for SFT/eval
+        # - 2 V2 rows (v2_demo_001, v2_demo_002) filtered by default
+        # - Remaining 4 rows routed: v1_demo_001 (ch6), v3_demo_001 (ch6), v4_demo_001_a (ch5!), v4_demo_001_b (ch6)
+        self.assertEqual(summary["cpt_routed_rows"], 4)
+        self.assertEqual(summary["skipped_reasons"]["reserved_final_for_sft_eval"], 2)
+        self.assertEqual(summary["skipped_reasons"]["filtered_v2_caption_dilution"], 2)
+
+        channels = {r["sample_id"]: r["channel"] for r in cpt_rows}
+        self.assertEqual(channels["cpt_v4_demo_001_knowledge_desc_a"], "ch5_flash_rag_raft")
+        self.assertEqual(channels["cpt_v1_demo_001_ip-brand"], "ch6_general_replay")
+        for row in cpt_rows:
+            self.assertEqual(cpt_builder.validate_cpt_record(row), [])
+
+    def test_end_to_end_refactor_integrates_with_cpt_builder_and_sft(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            refactor_dir = tmp_dir / "refactor"
+            manifest = router.run_refactor_pipeline(
+                [self.v1_v4_sample],
+                refactor_dir,
+                new_qa_paths=[self.new_qa_sample],
+                sft_target_rows=24,
+                val_ratio=0.25,
+                seed=42,
+            )
+            self.assertEqual(manifest["unified_sft"]["doc_family_overlap"], 0)
+            self.assertGreaterEqual(manifest["qwen_image_edit_seeds_count"], 2)
+
+            sft_train = cpt_builder.load_jsonl(refactor_dir / "sft_unified_train.jsonl")
+            sft_channels = {r["channel"] for r in sft_train}
+            self.assertIn("V1", sft_channels)
+            self.assertIn("wiki_rag_qa", sft_channels)
+
+            # Feed CPT replay output + 6ch wiki demo into build_mm_wiki_cpt.py
+            cpt_bundle_dir = tmp_dir / "cpt_bundle"
+            wiki_records = cpt_builder.load_jsonl(DOMAIN_DIR / "examples" / "cpt_mm_6ch_example.jsonl")
+            replay_records = cpt_builder.load_jsonl(refactor_dir / "cpt_v1_v4_replay.jsonl")
+            cpt_manifest = cpt_builder.build_cpt_bundle(
+                wiki_records + replay_records,
+                cpt_bundle_dir,
+                val_ratio=0.20,
+                stage1_rows=24,
+                stage2_rows=16,
+                seed=42,
+            )
+            self.assertEqual(cpt_manifest["doc_family_overlap"], 0)
+
+    def test_sft_native_config_valid(self) -> None:
+        cfg = json.loads(self.sft_cfg_path.read_text(encoding="utf-8"))
+        self.assertEqual(cfg["tuner_type"], "lora")
+        self.assertTrue(cfg["enable_channel_loss"])
+        self.assertTrue(cfg["freeze_vit"])
+        self.assertFalse(cfg["freeze_aligner"])
+
+    def test_unified_b300_shell_orchestrator_dry_run(self) -> None:
+        syntax = subprocess.run(["bash", "-n", str(self.unified_script)], capture_output=True, text=True)
+        self.assertEqual(syntax.returncode, 0, syntax.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            for tuner in ("lora", "full"):
+                work_dir = Path(tmp) / f"run_{tuner}"
+                env = {
+                    "PATH": os.environ.get("PATH", "/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin"),
+                    "WORK_DIR": str(work_dir),
+                    "DEMO": "1",
+                    "DRY_RUN": "1",
+                    "CPT_TUNER_TYPE": tuner,
+                }
+                proc = subprocess.run(
+                    ["bash", str(self.unified_script)],
+                    cwd=str(REPO_ROOT),
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                self.assertIn("megatron pt", proc.stdout)
+                self.assertIn("swift export", proc.stdout)
+                self.assertIn("megatron sft", proc.stdout)
+                self.assertTrue((work_dir / "step1_v1_v4_refactored" / "refactor_manifest.json").exists())
+                self.assertTrue((work_dir / "step2_cpt_bundle" / "manifest.json").exists())
+
+
+if __name__ == "__main__":
+    unittest.main()

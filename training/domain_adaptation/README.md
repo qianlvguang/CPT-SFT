@@ -4,13 +4,14 @@
 
 | 内容 | 文件 |
 |---|---|
-| 总流程与验证边界 | [方案总览](../../docs/training_plans/README.md)、[B300 多模态 Wiki+RAG CPT 方案](../../docs/training_plans/b300_multimodal_wiki_rag_cpt_plan.md) |
+| 总流程与验证边界 | [方案总览](../../docs/training_plans/README.md)、[B300 多模态 Wiki+RAG CPT 方案](../../docs/training_plans/b300_multimodal_wiki_rag_cpt_plan.md)、[V1～V4 统一 CPT+QA-SFT 重构方案](../../docs/training_plans/unified_v1_v4_cpt_qa_pipeline.md) |
 | 单条建议配方 | [recipe_example.json](recipe_example.json) |
-| 原生训练配置示例 | [Megatron WSD 配置](configs/cpt_27b_mm_rag_wsd_megatron.json)、[SWIFT LoRA 配置](configs/cpt_27b_mm_rag_swift_lora.json) |
+| 原生训练配置示例 | [Megatron WSD CPT 配置](configs/cpt_27b_mm_rag_wsd_megatron.json)、[SWIFT LoRA CPT 配置](configs/cpt_27b_mm_rag_swift_lora.json)、[B300 统一 SFT 配置](configs/sft_27b_unified_v1_v4_qa_b300.json) |
 | 多模态 6 通道构建脚本 | [build_mm_wiki_cpt.py](build_mm_wiki_cpt.py)（因果前缀校验、文档族零泄漏切分、WSD Stage 2 长尾重采样与 SHA256 清单） |
+| V1～V4 统一分流构建脚本 | [refactor_v1_v4_pipeline.py](refactor_v1_v4_pipeline.py)（三元键校验、过滤 V2/保留 `final`、V1/V4 进 CPT 回放/RAFT 与 Token 重平衡统一 SFT） |
 | 进阶训练与管理设计 | [27B QAT/QLoRA、WSD、新 Megatron 及原生配置](../../docs/training_plans/qwen35_27b_advanced_training_and_management.md) |
 | 原文登记示例 | [source_documents_example.jsonl](examples/source_documents_example.jsonl) |
-| SWIFT PT 格式示例 | [cpt_example.jsonl](examples/cpt_example.jsonl)、[6 通道多模态 CPT 示例](examples/cpt_mm_6ch_example.jsonl) |
+| SWIFT PT / V1～V4 示例 | [cpt_example.jsonl](examples/cpt_example.jsonl)、[6 通道多模态 CPT 示例](examples/cpt_mm_6ch_example.jsonl)、[V1～V4 历史样本示例](examples/v1_v4_legacy_sample.jsonl) |
 | QA 中间数据 | [qa_candidate_example.jsonl](examples/qa_candidate_example.jsonl) |
 | 风格 SFT 格式示例 | [style_sft_example.jsonl](examples/style_sft_example.jsonl) |
 | 来源映射示例 | [sample_provenance_example.jsonl](examples/sample_provenance_example.jsonl) |

@@ -2,7 +2,8 @@
 
 Qwen3.5-27B 是稠密模型：
 - 监督微调请使用 [train_qwen35_27b_swift.sh](train_qwen35_27b_swift.sh)；
-- **B300 8 卡多模态 Wiki/Logo/RAG WSD CPT** 请使用 [train_qwen35_27b_cpt_b300.sh](train_qwen35_27b_cpt_b300.sh)（支持 `BACKEND=megatron|swift`、`TUNER_TYPE=lora|full`、`LORA_SCOPE=all_linear|deep_mlp_regex`、`SMOKE=1` 与 `DRY_RUN=1`，配套方案见 [B300 多模态 Wiki+RAG CPT 方案](../../docs/training_plans/b300_multimodal_wiki_rag_cpt_plan.md)）。
+- **B300 8 卡多模态 Wiki/Logo/RAG WSD CPT** 请使用 [train_qwen35_27b_cpt_b300.sh](train_qwen35_27b_cpt_b300.sh)（支持 `BACKEND=megatron|swift`、`TUNER_TYPE=lora|full`、`LORA_SCOPE=all_linear|deep_mlp_regex`、`SMOKE=1` 与 `DRY_RUN=1`，配套方案见 [B300 多模态 Wiki+RAG CPT 方案](../../docs/training_plans/b300_multimodal_wiki_rag_cpt_plan.md)）；
+- **V1～V4 融入新 CPT 与统一 QA-SFT 端到端编排**请使用 [run_unified_b300_pipeline.sh](run_unified_b300_pipeline.sh)（配套方案见 [V1～V4 统一 CPT+QA-SFT 重构方案](../../docs/training_plans/unified_v1_v4_cpt_qa_pipeline.md)，支持 `DEMO=1 DRY_RUN=1` 本地跑通数据分流与命令生成）。
 
 用法和架构差异见 [Qwen3.5-27B 专项说明](../../docs/model_guide/qwen35_27b.md)。不要把本页 Flash-Next 的 router、expert、PLE 和 Megatron 并行配置套用于 27B。
 
