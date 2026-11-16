@@ -17,7 +17,7 @@
 | `qsa_muon_35b_a3b/Inference/README.md` | [inference/README.md](../inference/README.md) |
 | `qsa_muon_35b_a3b/Inference/TRAINING.md` | [training/swift/README.md](../training/swift/README.md) |
 | `qsa_muon_35b_a3b/Inference/check-target-regex.py` | [tools/check_target_regex.py](../tools/check_target_regex.py) |
-| `qsa_muon_35b_a3b/Inference/example-sft.jsonl` | [training/swift/example_sft.jsonl](../training/swift/example_sft.jsonl) |
+| `qsa_muon_35b_a3b/Inference/example-sft.jsonl` | [training/swift/examples/example_sft.jsonl](../training/swift/examples/example_sft.jsonl) |
 | `qsa_muon_35b_a3b/Inference/serve-b300.sh` | [inference/serve_b300.sh](../inference/serve_b300.sh) |
 | `qsa_muon_35b_a3b/Inference/serve-common.sh` | [inference/serve_common.sh](../inference/serve_common.sh) |
 | `qsa_muon_35b_a3b/Inference/serve-qwen35-27b.sh` | [inference/serve_qwen35_27b.sh](../inference/serve_qwen35_27b.sh) |

@@ -1,9 +1,12 @@
-# B300：MS-SWIFT 训练入口（Flash-Next SFT & 27B CPT/SFT）
+# MS-SWIFT 单模型独立 SFT 入口（Flash-Next & 单卡 27B）
+
+> **目录边界说明**：本目录仅保留两个**单模型独立 SFT 脚本**（分别服务 `Qwen3.8-Flash-Next` 的 B300 单独 LoRA 尝试，以及 `Qwen3.5-27B` 单卡轻量 SFT 入门）。**B300 27B 多模态 Wiki+RAG CPT 与 V1～V4+QA 统一端到端主线**已收拢至 [`training/domain_adaptation/`](../domain_adaptation/README.md)。
 
 Qwen3.5-27B 是稠密模型：
-- 监督微调请使用 [train_qwen35_27b_swift.sh](train_qwen35_27b_swift.sh)；
-- **B300 8 卡多模态 Wiki/Logo/RAG WSD CPT** 请使用 [train_qwen35_27b_cpt_b300.sh](train_qwen35_27b_cpt_b300.sh)（支持 `BACKEND=megatron|swift`、`TUNER_TYPE=lora|full`、`LORA_SCOPE=all_linear|deep_mlp_regex`、`SMOKE=1` 与 `DRY_RUN=1`，配套方案见 [B300 多模态 Wiki+RAG CPT 方案](../../docs/training_plans/b300_multimodal_wiki_rag_cpt_plan.md)）；
-- **V1～V4 融入新 CPT 与统一 QA-SFT 端到端编排**请使用 [run_unified_b300_pipeline.sh](run_unified_b300_pipeline.sh)（配套方案见 [V1～V4 统一 CPT+QA-SFT 重构方案](../../docs/training_plans/unified_v1_v4_cpt_qa_pipeline.md)，支持 `DEMO=1 DRY_RUN=1` 本地跑通数据分流与命令生成）。
+- 单卡轻量 SFT 入门请使用 [train_qwen35_27b_swift.sh](train_qwen35_27b_swift.sh)（同时被 Montessori 与 Datawheel 复用）；
+- **B300 8 卡多模态 CPT 与 V1～V4 统一编排**请前往 [`training/domain_adaptation/`](../domain_adaptation/README.md)（对应 [train_qwen35_27b_cpt_b300.sh](../domain_adaptation/train_qwen35_27b_cpt_b300.sh) 与 [run_unified_b300_pipeline.sh](../domain_adaptation/run_unified_b300_pipeline.sh)）。
+
+用法和架构差异见 [Qwen3.5-27B 专项说明](../../docs/model_guide/qwen35_27b.md)。不要把本页 Flash-Next 的 router、expert、PLE 和 Megatron 并行配置套用于 27B。
 
 用法和架构差异见 [Qwen3.5-27B 专项说明](../../docs/model_guide/qwen35_27b.md)。不要把本页 Flash-Next 的 router、expert、PLE 和 Megatron 并行配置套用于 27B。
 
@@ -19,7 +22,7 @@ BF16 模型文件约 335 GiB，准备额外缓存、训练输出空间和充足�
 
 ## 数据和启动
 
-准备 UTF-8 JSONL，每行一个 `messages` 对话，格式参见 [example_sft.jsonl](example_sft.jsonl)。示例只有两条，**仅用于检查格式，不是有效训练集**。真实训练应使用有代表性的训练集，并单独准备验证集或配置适当的数据集切分。请确保样本中的 assistant 回答是期望学习的内容，选择适当的思考内容格式和数据许可。
+准备 UTF-8 JSONL，每行一个 `messages` 对话，格式参见 [examples/example_sft.jsonl](examples/example_sft.jsonl)。示例只有两条，**仅用于检查格式，不是有效训练集**。真实训练应使用有代表性的训练集，并单独准备验证集或配置适当的数据集切分。请确保样本中的 assistant 回答是期望学习的内容，选择适当的思考内容格式和数据许可。
 
 ```bash
 cd /path/to/CPT-SFT/training/swift

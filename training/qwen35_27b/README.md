@@ -1,4 +1,6 @@
-# V1～V4 唯一推荐训练路线
+# H200 历史归档基线：V1～V4 三阶段 SFT 路线（ms-swift 4.3.2）
+
+> **版本定位提示**：本目录对应早期 **H200 × 8（`ms-swift 4.3.2` + `Megatron-Core 0.18.0`）** 下的 V1～V4 独立三阶段纯 SFT 配方（`legacy/` 保留更早期的实验记录与 sweep）。若要在 **B300 上执行 Wiki/Logo/RAG 多模态 CPT 并统一融入 V1～V4 与新 QA**，请直接使用当前主线 **[`training/domain_adaptation/`](../domain_adaptation/README.md)**。
 
 入口：[train_s1_s3_recommended.sh](train_s1_s3_recommended.sh)。部署时把它与 [Python 调度器](train_s1_s3_recommended.py)、[插件](recommended_pipeline_plugin.py) 放在同一目录。历史脚本与 sweep 仅作为实验记录保留；新入口不调用它们。
 

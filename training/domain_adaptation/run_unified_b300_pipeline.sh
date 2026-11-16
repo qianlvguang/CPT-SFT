@@ -11,7 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-DOMAIN_DIR="$REPO_ROOT/training/domain_adaptation"
+DOMAIN_DIR="$SCRIPT_DIR"
 
 WORK_DIR=${WORK_DIR:-"${TMPDIR:-/tmp}/cpt_sft_unified_b300"}
 MODEL=${MODEL:-Qwen/Qwen3.5-27B}
@@ -22,7 +22,7 @@ DRY_RUN=${DRY_RUN:-1}
 DEMO=${DEMO:-0}
 
 if [[ $MODEL == *Flash-Next* || $MODEL == *qwen4_exp* ]]; then
-  echo 'Use train_b300_swift.sh for Qwen3.8-Flash-Next; this unified pipeline targets 27B.' >&2
+  echo 'Use training/swift/train_b300_swift.sh for Qwen3.8-Flash-Next; this unified pipeline targets 27B.' >&2
   exit 2
 fi
 if [[ $BACKEND != megatron && $BACKEND != swift ]]; then

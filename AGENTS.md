@@ -26,10 +26,10 @@ flowchart LR
 
 | 目录 | 职责 | 关键入口 |
 |---|---|---|
-| `training/qwen35_27b/` | H200×8 上 Qwen3.5-27B 多阶段（S1→S2→S3）累计 LoRA 主线，支持 V1–V6 多通道 Loss | [`train_s1_s3_recommended.py`](training/qwen35_27b/train_s1_s3_recommended.py)、[`train_s1_s3_recommended.sh`](training/qwen35_27b/train_s1_s3_recommended.sh) |
-| `training/qsa_muon_35b_a3b/` | Qwen3.5-35B-A3B 的 QSA 注意力预热、CPT、SFT 与 Muon 优化器实验 | [`run_cpt_sft_qsa_35a3_h200x8.sh`](training/qsa_muon_35b_a3b/run_cpt_sft_qsa_35a3_h200x8.sh) |
-| `training/swift/` | MS-SWIFT 训练入口（B300 Qwen3.8-Flash-Next Megatron SFT、B300 27B 多模态 WSD CPT、V1～V4 统一 CPT+QA 编排与 27B LoRA SFT） | [`run_unified_b300_pipeline.sh`](training/swift/run_unified_b300_pipeline.sh)、[`train_qwen35_27b_cpt_b300.sh`](training/swift/train_qwen35_27b_cpt_b300.sh)、[`train_qwen35_27b_swift.sh`](training/swift/train_qwen35_27b_swift.sh)、[`train_b300_swift.sh`](training/swift/train_b300_swift.sh) |
-| `training/domain_adaptation/` | 法规/文章/Wiki 领域 CPT（含 6 通道图文 RAG 构建）、V1～V4 分流重构、有据 QA 合成、严谨引用风格 SFT 及 **Montessori-Instruct 闭环管线** | [`refactor_v1_v4_pipeline.py`](training/domain_adaptation/refactor_v1_v4_pipeline.py)、[`build_mm_wiki_cpt.py`](training/domain_adaptation/build_mm_wiki_cpt.py)、[`montessori/run_montessori_pipeline.sh`](training/domain_adaptation/montessori/run_montessori_pipeline.sh) |
+| `training/domain_adaptation/` | **当前 B300 主线**：6 通道多模态 Wiki+RAG WSD CPT、V1～V4 分流重构、统一 QA-SFT 编排及 **Montessori-Instruct 闭环管线**（示例与参考模板统一归入 `examples/`） | [`run_unified_b300_pipeline.sh`](training/domain_adaptation/run_unified_b300_pipeline.sh)、[`train_qwen35_27b_cpt_b300.sh`](training/domain_adaptation/train_qwen35_27b_cpt_b300.sh)、[`refactor_v1_v4_pipeline.py`](training/domain_adaptation/refactor_v1_v4_pipeline.py)、[`build_mm_wiki_cpt.py`](training/domain_adaptation/build_mm_wiki_cpt.py)、[`montessori/run_montessori_pipeline.sh`](training/domain_adaptation/montessori/run_montessori_pipeline.sh) |
+| `training/swift/` | **单模型独立 SFT 入口**：Flash-Next B300 单独 LoRA 尝试与单卡 27B LoRA SFT（供 Montessori/Datawheel 复用；示例位于 `examples/`） | [`train_qwen35_27b_swift.sh`](training/swift/train_qwen35_27b_swift.sh)、[`train_b300_swift.sh`](training/swift/train_b300_swift.sh) |
+| `training/qwen35_27b/` | **历史 H200 归档基线**（`ms-swift 4.3.2`）：早期 H200×8 三阶段（S1→S2→S3）V1～V4 独立 SFT 线，支持 V1–V6 多通道 Loss | [`train_s1_s3_recommended.py`](training/qwen35_27b/train_s1_s3_recommended.py)、[`train_s1_s3_recommended.sh`](training/qwen35_27b/train_s1_s3_recommended.sh) |
+| `training/qsa_muon_35b_a3b/` | **独立架构探索实验**：Qwen3.5-35B-A3B 的 QSA 注意力预热、CPT、SFT 与 Muon 优化器实验 | [`run_cpt_sft_qsa_35a3_h200x8.sh`](training/qsa_muon_35b_a3b/run_cpt_sft_qsa_35a3_h200x8.sh) |
 | `inference/` | vLLM 0.32.0 / SGLang 在线推理服务脚本（B300 / RTX PRO 6000 / H200） | [`serve_qwen35_27b.sh`](inference/serve_qwen35_27b.sh)、[`serve_b300.sh`](inference/serve_b300.sh) |
 | `docs/` | 模型架构指南、FP8/NVFP4 量化报告、领域训练计划与历史实验日志 | [`docs/training_plans/README.md`](docs/training_plans/README.md)、[`docs/model_guide/README.md`](docs/model_guide/README.md) |
 | `tools/` & `tests/` | Safetensors 头部检查、正则覆盖检查及标准库回归测试套件 | [`tests/test_recommended_pipeline.py`](tests/test_recommended_pipeline.py)、[`tests/test_montessori_pipeline.py`](tests/test_montessori_pipeline.py) |
@@ -68,10 +68,10 @@ python3 tests/test_unified_v1_v4_pipeline.py -v
 # 3. 训练与合成流水线 Dry-Run 检查
 bash training/qwen35_27b/train_s1_s3_recommended.sh plan
 DRY_RUN=1 bash training/domain_adaptation/montessori/run_montessori_pipeline.sh
-DATASET=training/swift/example_sft.jsonl DRY_RUN=1 bash training/swift/train_qwen35_27b_swift.sh
-DATASET=training/swift/example_sft.jsonl DRY_RUN=1 bash training/swift/train_b300_swift.sh
-DATASET=training/domain_adaptation/examples/cpt_mm_6ch_example.jsonl DRY_RUN=1 bash training/swift/train_qwen35_27b_cpt_b300.sh
-WORK_DIR=/tmp/cpt_sft_unified_check DEMO=1 DRY_RUN=1 bash training/swift/run_unified_b300_pipeline.sh
+DATASET=training/swift/examples/example_sft.jsonl DRY_RUN=1 bash training/swift/train_qwen35_27b_swift.sh
+DATASET=training/swift/examples/example_sft.jsonl DRY_RUN=1 bash training/swift/train_b300_swift.sh
+DATASET=training/domain_adaptation/examples/cpt_mm_6ch_example.jsonl DRY_RUN=1 bash training/domain_adaptation/train_qwen35_27b_cpt_b300.sh
+WORK_DIR=/tmp/cpt_sft_unified_check DEMO=1 DRY_RUN=1 bash training/domain_adaptation/run_unified_b300_pipeline.sh
 
 # 4. 清理演示临时产物并确认 git status 干净
 rm -rf training/domain_adaptation/montessori/output_demo

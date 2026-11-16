@@ -12,7 +12,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOMAIN_DIR = REPO_ROOT / "training" / "domain_adaptation"
-SWIFT_DIR = REPO_ROOT / "training" / "swift"
 sys.path.insert(0, str(DOMAIN_DIR))
 
 import build_mm_wiki_cpt as cpt_builder  # noqa: E402
@@ -23,8 +22,8 @@ class UnifiedV1V4PipelineTests(unittest.TestCase):
     def setUp(self) -> None:
         self.v1_v4_sample = DOMAIN_DIR / "examples" / "v1_v4_legacy_sample.jsonl"
         self.new_qa_sample = DOMAIN_DIR / "examples" / "style_sft_example.jsonl"
-        self.sft_cfg_path = DOMAIN_DIR / "configs" / "sft_27b_unified_v1_v4_qa_b300.json"
-        self.unified_script = SWIFT_DIR / "run_unified_b300_pipeline.sh"
+        self.sft_cfg_path = DOMAIN_DIR / "examples" / "configs" / "sft_27b_unified_v1_v4_qa_b300.json"
+        self.unified_script = DOMAIN_DIR / "run_unified_b300_pipeline.sh"
 
     def test_ternary_key_keeps_v4_multi_image_and_rejects_cross_pool_leak(self) -> None:
         raw_rows = [(r, self.v1_v4_sample) for r in cpt_builder.load_jsonl(self.v1_v4_sample)]

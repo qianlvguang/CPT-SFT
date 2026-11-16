@@ -10,11 +10,10 @@
 CPT-SFT/
 ├── AGENTS.md                # AI 编码代理工作约定与跨项目（Datawheel / OPD）互通说明
 ├── training/
-│   ├── qwen35_27b/          # H200×8，V1～V4 累计 LoRA 推荐路线
-│   │   └── legacy/          # 历史训练与 sweep 脚本，保留原始内容
-│   ├── qsa_muon_35b_a3b/    # H200×8，QSA 预热、CPT、SFT 与插件
-│   ├── swift/               # B300 Flash-Next 与单卡 27B 微调入口
-│   └── domain_adaptation/   # 法规/文章/Wiki CPT、QA 合成、引用风格方案
+│   ├── domain_adaptation/   # ✅ 当前 B300 主线：多模态 Wiki+RAG CPT、V1～V4 融入重构、Montessori QA 与统一编排（示例归入 examples/）
+│   ├── swift/               # 🧪 单模型独立 SFT 入口（Flash-Next B300 单独尝试与单卡 27B LoRA 入门）
+│   ├── qwen35_27b/          # 📦 历史 H200 归档基线（ms-swift 4.3.2，旧 V1～V4 三阶段纯 SFT；legacy/ 为更早 sweep）
+│   └── qsa_muon_35b_a3b/    # 🔬 独立架构探索实验（H200×8，35B-A3B QSA + Muon）
 ├── inference/               # vLLM / SGLang 服务脚本
 ├── environment/             # H200 依赖、CUDA/PyTorch 说明及环境脚本
 ├── docs/
@@ -31,10 +30,10 @@ CPT-SFT/
 
 | 任务 | 入口与说明 | 验证边界 |
 |---|---|---|
-| 27B 多阶段 SFT | [推荐路线](training/qwen35_27b/README.md)、[启动脚本](training/qwen35_27b/train_s1_s3_recommended.sh) | 调度器有标准库回归测试；推荐数据组合尚未完成 H200 实训验证 |
-| 35B-A3B QSA + Muon | [方案](docs/qsa_muon_35b_a3b.md)、[训练入口](training/qsa_muon_35b_a3b/run_cpt_sft_qsa_35a3_h200x8.sh) | 架构、算子与优化器需在目标环境验证 |
-| B300 / 单卡 27B 微调与 CPT | [MS-SWIFT 说明](training/swift/README.md)、[B300 27B CPT 启动](training/swift/train_qwen35_27b_cpt_b300.sh)、[统一 V1～V4+Wiki+QA 编排](training/swift/run_unified_b300_pipeline.sh) | 不同模型使用各自入口；B300 CPT、V1～V4 分流构建与统一编排已通过本地单元测试与 `DRY_RUN=1`，尚未完成目标 GPU 实训 |
-| 领域知识与回答风格 | [CPT → QA → 风格总方案](docs/training_plans/README.md)、[B300 多模态 Wiki+RAG CPT](docs/training_plans/b300_multimodal_wiki_rag_cpt_plan.md)、[V1～V4 统一重构方案](docs/training_plans/unified_v1_v4_cpt_qa_pipeline.md)、[配置与示例](training/domain_adaptation/README.md)、[Montessori-Instruct 管线](training/domain_adaptation/montessori/README.md) | 法规/文章/Wiki 原文与图文 6 通道适配、V1～V4 三元去重路由与 Token 重平衡，含单步 Loss 差分探针、黑盒 API 对比引导与偏好导出（已通过本地单元测试与 dry-run） |
+| **B300 27B 统一主线**（CPT+V1～V4+QA） | [目录说明](training/domain_adaptation/README.md)、[B300 多模态 CPT](docs/training_plans/b300_multimodal_wiki_rag_cpt_plan.md)、[V1～V4 重构](docs/training_plans/unified_v1_v4_cpt_qa_pipeline.md)、[一键编排](training/domain_adaptation/run_unified_b300_pipeline.sh)、[Montessori QA](training/domain_adaptation/montessori/README.md) | 6 通道构建、V1～V4 三元去重路由、B300 CPT 启动与端到端编排已通过本地单元测试与 `DRY_RUN=1`，尚未完成目标 B300 实训 |
+| 单模型独立 SFT（Flash-Next / 单卡 27B） | [SWIFT 独立入口](training/swift/README.md)（[Flash-Next B300](training/swift/train_b300_swift.sh) / [单卡 27B](training/swift/train_qwen35_27b_swift.sh)） | 单模型独立启动入口；目标硬件尚未验证 |
+| 历史 H200 27B 三阶段 SFT（归档） | [H200 归档基线](training/qwen35_27b/README.md)、[启动脚本](training/qwen35_27b/train_s1_s3_recommended.sh) | 调度器有标准库回归测试（`ms-swift 4.3.2`）；推荐数据组合尚未完成 H200 实训验证 |
+| 35B-A3B QSA + Muon（实验线） | [方案](docs/qsa_muon_35b_a3b.md)、[训练入口](training/qsa_muon_35b_a3b/run_cpt_sft_qsa_35a3_h200x8.sh) | 架构、算子与优化器需在目标环境验证 |
 | 在线推理 | [服务说明](inference/README.md)、[H200 QSA 服务](inference/serve_vllm_sglang_h200.sh) | B300/RTX 脚本固定 vLLM 0.32.0；实际权重与硬件需分别验证 |
 | 环境安装与检查 | [环境说明](environment/README.md) | 安装脚本按需运行，不随本地检查自动安装依赖 |
 | 模型与量化研究 | [模型指南](docs/model_guide/README.md)、[JEV 报告](docs/reports/qwen3_5_jev_multimodal_training_and_quantization_report.md) | 研究方案和报告中的估算不能视作实测结果 |
@@ -66,10 +65,10 @@ python3 tests/test_b300_mm_cpt_pipeline.py
 python3 tests/test_unified_v1_v4_pipeline.py
 bash training/qwen35_27b/train_s1_s3_recommended.sh plan
 DRY_RUN=1 bash training/domain_adaptation/montessori/run_montessori_pipeline.sh
-DATASET=training/swift/example_sft.jsonl DRY_RUN=1 bash training/swift/train_qwen35_27b_swift.sh
-DATASET=training/swift/example_sft.jsonl DRY_RUN=1 bash training/swift/train_b300_swift.sh
-DATASET=training/domain_adaptation/examples/cpt_mm_6ch_example.jsonl DRY_RUN=1 bash training/swift/train_qwen35_27b_cpt_b300.sh
-DEMO=1 DRY_RUN=1 bash training/swift/run_unified_b300_pipeline.sh
+DATASET=training/swift/examples/example_sft.jsonl DRY_RUN=1 bash training/swift/train_qwen35_27b_swift.sh
+DATASET=training/swift/examples/example_sft.jsonl DRY_RUN=1 bash training/swift/train_b300_swift.sh
+DATASET=training/domain_adaptation/examples/cpt_mm_6ch_example.jsonl DRY_RUN=1 bash training/domain_adaptation/train_qwen35_27b_cpt_b300.sh
+DEMO=1 DRY_RUN=1 bash training/domain_adaptation/run_unified_b300_pipeline.sh
 DRY_RUN=1 bash inference/serve_qwen35_27b.sh
 ```
 

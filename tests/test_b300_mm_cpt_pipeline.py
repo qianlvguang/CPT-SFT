@@ -13,7 +13,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOMAIN_DIR = REPO_ROOT / "training" / "domain_adaptation"
-SWIFT_DIR = REPO_ROOT / "training" / "swift"
 sys.path.insert(0, str(DOMAIN_DIR))
 
 import build_mm_wiki_cpt as builder  # noqa: E402
@@ -22,9 +21,9 @@ import build_mm_wiki_cpt as builder  # noqa: E402
 class B300MultimodalCptTests(unittest.TestCase):
     def setUp(self) -> None:
         self.example_path = DOMAIN_DIR / "examples" / "cpt_mm_6ch_example.jsonl"
-        self.megatron_cfg_path = DOMAIN_DIR / "configs" / "cpt_27b_mm_rag_wsd_megatron.json"
-        self.swift_cfg_path = DOMAIN_DIR / "configs" / "cpt_27b_mm_rag_swift_lora.json"
-        self.cpt_script = SWIFT_DIR / "train_qwen35_27b_cpt_b300.sh"
+        self.megatron_cfg_path = DOMAIN_DIR / "examples" / "configs" / "cpt_27b_mm_rag_wsd_megatron.json"
+        self.swift_cfg_path = DOMAIN_DIR / "examples" / "configs" / "cpt_27b_mm_rag_swift_lora.json"
+        self.cpt_script = DOMAIN_DIR / "train_qwen35_27b_cpt_b300.sh"
 
     def test_six_channel_example_jsonl_valid(self) -> None:
         rows = builder.load_jsonl(self.example_path)

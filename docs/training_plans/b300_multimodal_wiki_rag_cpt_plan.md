@@ -85,7 +85,7 @@ flowchart LR
 
 ### 4.1 后端入口与模块解冻策略
 
-对应启动脚本：[`training/swift/train_qwen35_27b_cpt_b300.sh`](../../training/swift/train_qwen35_27b_cpt_b300.sh)，原生配置示例位于 [`training/domain_adaptation/configs/`](../../training/domain_adaptation/configs/)：
+对应启动脚本：[`training/domain_adaptation/train_qwen35_27b_cpt_b300.sh`](../../training/domain_adaptation/train_qwen35_27b_cpt_b300.sh)，独立原生配置示例位于 [`training/domain_adaptation/examples/configs/`](../../training/domain_adaptation/examples/configs/)：
 
 - **默认后端（`BACKEND=megatron`，`megatron pt`）**：适用 8×B300 大规模 WSD 训练（`TP=2/4, PP=1, DP=4/2`, `MAX_LENGTH=16384`, `GLOBAL_BATCH_SIZE=64`, `packing=true`, `padding_free=true`）。
 - **轻量备选后端（`BACKEND=swift`，`swift pt`）**：适用单卡/多卡 BF16 深层 LoRA 快速探针。
@@ -134,11 +134,11 @@ python3 training/domain_adaptation/build_mm_wiki_cpt.py --demo \
 # 2. 校验 B300 27B CPT 启动命令（megatron pt WSD & swift pt 深层 LoRA）
 DATASET=/tmp/mm_cpt_demo/stage1_train.jsonl VAL_DATASET=/tmp/mm_cpt_demo/val.jsonl \
   BACKEND=megatron TUNER_TYPE=full TRAIN_ITERS=1000 LR_DECAY_STYLE=WSD DRY_RUN=1 \
-  bash training/swift/train_qwen35_27b_cpt_b300.sh
+  bash training/domain_adaptation/train_qwen35_27b_cpt_b300.sh
 
 DATASET=/tmp/mm_cpt_demo/stage1_train.jsonl VAL_DATASET=/tmp/mm_cpt_demo/val.jsonl \
   BACKEND=swift TUNER_TYPE=lora LORA_SCOPE=deep_mlp_regex DRY_RUN=1 \
-  bash training/swift/train_qwen35_27b_cpt_b300.sh
+  bash training/domain_adaptation/train_qwen35_27b_cpt_b300.sh
 
 # 3. 运行回归测试
 python3 tests/test_b300_mm_cpt_pipeline.py -v

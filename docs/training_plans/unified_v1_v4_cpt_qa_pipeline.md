@@ -55,13 +55,13 @@ flowchart TD
 
 ## 3. 在 B300 上一键运行重构后流水线
 
-统一端到端编排入口：[`run_unified_b300_pipeline.sh`](../../training/swift/run_unified_b300_pipeline.sh)，配套 SFT 原生配置示例：[`sft_27b_unified_v1_v4_qa_b300.json`](../../training/domain_adaptation/configs/sft_27b_unified_v1_v4_qa_b300.json)。
+统一端到端编排入口：[`run_unified_b300_pipeline.sh`](../../training/domain_adaptation/run_unified_b300_pipeline.sh)，独立 SFT 配置模板：[`sft_27b_unified_v1_v4_qa_b300.json`](../../training/domain_adaptation/examples/configs/sft_27b_unified_v1_v4_qa_b300.json)。
 
 ### 3.1 本地无 GPU 端到端 Dry-Run 验证
 
 ```bash
 cd Coding/CPT-SFT
-DEMO=1 DRY_RUN=1 bash training/swift/run_unified_b300_pipeline.sh
+DEMO=1 DRY_RUN=1 bash training/domain_adaptation/run_unified_b300_pipeline.sh
 ```
 
 ### 3.2 真实 B300 集群分步使用方式
@@ -72,7 +72,7 @@ DEMO=1 DRY_RUN=1 bash training/swift/run_unified_b300_pipeline.sh
    WIKI_CPT_INPUTS="/data/wiki_stubs.jsonl /data/logo_flag_mm.jsonl /data/qwen_img_synth.jsonl" \
    NEW_QA_INPUTS="/data/montessori_sft.jsonl /data/wiki_rag_qa.jsonl" \
    CPT_TUNER_TYPE=lora BACKEND=megatron SMOKE=1 DRY_RUN=1 \
-   bash training/swift/run_unified_b300_pipeline.sh
+   bash training/domain_adaptation/run_unified_b300_pipeline.sh
    ```
    *(注：若在远端读取 `.parquet`，需先确认训练环境已安装 `pyarrow`；同时若需将 V4 升级为 `ch5_flash_rag_raft`，可通过 `RAG_EVIDENCE_MAP=/data/v4_rag_evidence.json` 传入 `{sample_id: ["[S1] ..."]}` 映射。)*
 2. **先跑 10 步 `SMOKE=1` 再全量开跑**：检查日志中 CPT 的 `ch1..ch6` 与 SFT 的 `loss_V1..V4`、`loss_wiki_rag_qa` 均有正常梯度，且无跨池数据泄漏后，设 `DRY_RUN=0 SMOKE=0` 正式启动。

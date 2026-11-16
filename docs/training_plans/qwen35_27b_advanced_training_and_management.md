@@ -204,7 +204,7 @@ $CPT_SFT_STORAGE/                      # Git 外的独立存储
 
 ## 7. 配置与脚本怎样最简洁
 
-建议采用**每个后端一份原生配置，启动入口只负责选阶段和传入资源路径**。稳定超参写文件，GPU 选择和路径在启动时显式给出，最终实际参数保存到 run 目录。原有 `recipe_example.json` 是跨阶段设计说明，不直接传给任一训练器；不要把它误认为已实现的统一 CLI。
+建议采用**每个后端一份原生配置，启动入口只负责选阶段和传入资源路径**。稳定超参写文件，GPU 选择和路径在启动时显式给出，最终实际参数保存到 run 目录。原有 `examples/recipe_example.json`（早期 `recipe_example.json`）是跨阶段设计说明，不直接传给任一训练器；不要把它误认为已实现的统一 CLI。
 
 SWIFT 原生支持 `swift sft xxx.json` / YAML 及 CLI 覆盖，Megatron-SWIFT 同样有原生配置入口。ModelOpt 的训练脚本使用自己的 `--config`，Accelerate 的分布式配置则是另一份文件。[SWIFT 配置格式](https://swift.readthedocs.io/en/latest/Instruction/Command-line-parameters.html#yaml-json-support)、[ModelOpt 配置接口](https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/llm_qat)
 

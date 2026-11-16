@@ -16,7 +16,7 @@ set -euo pipefail
 : "${DATASET:?Set DATASET to a local JSONL/Parquet file or space-separated dataset list}"
 MODEL=${MODEL:-Qwen/Qwen3.5-27B}
 if [[ $MODEL == *Flash-Next* || $MODEL == *qwen4_exp* ]]; then
-  echo 'Use train_b300_swift.sh for Qwen3.8-Flash-Next; this script is for 27B dense CPT.' >&2
+  echo 'Use training/swift/train_b300_swift.sh for Qwen3.8-Flash-Next; this script is for 27B dense CPT.' >&2
   exit 2
 fi
 
