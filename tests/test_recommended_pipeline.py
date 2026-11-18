@@ -10,7 +10,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-PIPELINE_DIR = Path(__file__).resolve().parents[1] / "training" / "qwen35_27b"
+PIPELINE_DIR = Path(__file__).resolve().parents[1] / "archive" / "training" / "qwen35_27b_h200"
 
 spec = importlib.util.spec_from_file_location("recommended", PIPELINE_DIR / "train_s1_s3_recommended.py")
 pipeline = importlib.util.module_from_spec(spec)

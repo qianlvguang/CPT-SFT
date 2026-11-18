@@ -11,8 +11,8 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DOMAIN_DIR = REPO_ROOT / "training" / "domain_adaptation"
-sys.path.insert(0, str(DOMAIN_DIR))
+FLASH_DIR = REPO_ROOT / "training" / "flash"
+sys.path.insert(0, str(FLASH_DIR))
 
 import build_mm_wiki_cpt as cpt_builder  # noqa: E402
 import refactor_v1_v4_pipeline as router  # noqa: E402
@@ -20,10 +20,10 @@ import refactor_v1_v4_pipeline as router  # noqa: E402
 
 class UnifiedV1V4PipelineTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.v1_v4_sample = DOMAIN_DIR / "examples" / "v1_v4_legacy_sample.jsonl"
-        self.new_qa_sample = DOMAIN_DIR / "examples" / "style_sft_example.jsonl"
-        self.sft_cfg_path = DOMAIN_DIR / "examples" / "configs" / "sft_27b_unified_v1_v4_qa_b300.json"
-        self.unified_script = DOMAIN_DIR / "run_unified_b300_pipeline.sh"
+        self.v1_v4_sample = FLASH_DIR / "examples" / "v1_v4_legacy_sample.jsonl"
+        self.new_qa_sample = FLASH_DIR / "examples" / "style_sft_example.jsonl"
+        self.sft_cfg_path = FLASH_DIR / "examples" / "configs" / "sft_27b_unified_v1_v4_qa_b300.json"
+        self.unified_script = FLASH_DIR / "run_flash_pipeline.sh"
 
     def test_ternary_key_keeps_v4_multi_image_and_rejects_cross_pool_leak(self) -> None:
         raw_rows = [(r, self.v1_v4_sample) for r in cpt_builder.load_jsonl(self.v1_v4_sample)]
@@ -96,7 +96,7 @@ class UnifiedV1V4PipelineTests(unittest.TestCase):
 
             # Feed CPT replay output + 6ch wiki demo into build_mm_wiki_cpt.py
             cpt_bundle_dir = tmp_dir / "cpt_bundle"
-            wiki_records = cpt_builder.load_jsonl(DOMAIN_DIR / "examples" / "cpt_mm_6ch_example.jsonl")
+            wiki_records = cpt_builder.load_jsonl(FLASH_DIR / "examples" / "cpt_mm_6ch_example.jsonl")
             replay_records = cpt_builder.load_jsonl(refactor_dir / "cpt_v1_v4_replay.jsonl")
             cpt_manifest = cpt_builder.build_cpt_bundle(
                 wiki_records + replay_records,
@@ -107,6 +107,34 @@ class UnifiedV1V4PipelineTests(unittest.TestCase):
                 seed=42,
             )
             self.assertEqual(cpt_manifest["doc_family_overlap"], 0)
+
+    def test_tier1_edit_seeds_and_cate_map_enrichment(self) -> None:
+        sample = [
+            {
+                "sample_id": "s_tier1",
+                "cate_id": "brand_logo",
+                "variant": 3,
+                "doc_family_id": "fam_t1",
+                "images": ["img_t1.jpg"],
+                "messages": [{"role": "assistant", "content": "ok"}],
+            },
+            {
+                "sample_id": "s_mapped",
+                "cate_id": "cate_99",
+                "variant": 1,
+                "doc_family_id": "fam_mapped",
+                "images": ["img_mapped.jpg"],
+                "messages": [{"role": "assistant", "content": "ok"}],
+            },
+        ]
+        seeds = router.extract_qwen_image_edit_seeds(
+            sample,
+            cate_map={"cate_99": "示例品牌名"},
+        )
+        self.assertEqual(len(seeds), 2)
+        by_sid = {s["source_sample_id"]: s for s in seeds}
+        self.assertEqual(by_sid["s_tier1"]["cate_id"], "brand_logo")
+        self.assertEqual(by_sid["s_mapped"]["cate_name"], "示例品牌名")
 
     def test_sft_native_config_valid(self) -> None:
         cfg = json.loads(self.sft_cfg_path.read_text(encoding="utf-8"))
@@ -140,8 +168,51 @@ class UnifiedV1V4PipelineTests(unittest.TestCase):
                 self.assertIn("megatron pt", proc.stdout)
                 self.assertIn("swift export", proc.stdout)
                 self.assertIn("megatron sft", proc.stdout)
+                self.assertTrue((work_dir / "step0_qa_cot_v03" / "cot_manifest.json").exists())
                 self.assertTrue((work_dir / "step1_v1_v4_refactored" / "refactor_manifest.json").exists())
                 self.assertTrue((work_dir / "step2_cpt_bundle" / "manifest.json").exists())
+
+    def test_three_sft_comparison_arms(self) -> None:
+        raw_rows = [(r, self.v1_v4_sample) for r in cpt_builder.load_jsonl(self.v1_v4_sample)]
+        cleaned, _ = router.validate_and_dedup_v1_v4(raw_rows)
+        qa_rows = [
+            {
+                "sample_id": "qa_cot_1",
+                "doc_family_id": "fam_cot_1",
+                "enable_thinking": True,
+                "messages": [
+                    {"role": "user", "content": "Q1"},
+                    {"role": "assistant", "content": "<think>\n推演过程\n</think>\n\nA1"},
+                ],
+            },
+            {
+                "sample_id": "qa_dir_1",
+                "doc_family_id": "fam_dir_1",
+                "enable_thinking": False,
+                "messages": [
+                    {"role": "user", "content": "Q2"},
+                    {"role": "assistant", "content": "A2"},
+                ],
+            },
+        ]
+        _, _, sum_ood = router.build_unified_sft_bundle(cleaned, qa_rows, sft_arm="ood_only", val_ratio=0.0)
+        self.assertNotIn("wiki_rag_qa_cot", sum_ood["channels"])
+        self.assertNotIn("wiki_rag_qa_direct", sum_ood["channels"])
+
+        train_dir, _, sum_dir = router.build_unified_sft_bundle(
+            cleaned, qa_rows, sft_arm="ood_plus_qa_direct", val_ratio=0.0
+        )
+        self.assertIn("wiki_rag_qa_direct", sum_dir["channels"])
+        for row in train_dir:
+            if row["channel"] == "wiki_rag_qa_direct":
+                self.assertFalse(row["enable_thinking"])
+                self.assertNotIn("<think>", row["messages"][-1]["content"])
+
+        _, _, sum_cot = router.build_unified_sft_bundle(
+            cleaned, qa_rows, sft_arm="ood_plus_qa_cot", cot_direct_ratio=0.8, val_ratio=0.0
+        )
+        self.assertIn("wiki_rag_qa_cot", sum_cot["channels"])
+        self.assertIn("wiki_rag_qa_direct", sum_cot["channels"])
 
 
 if __name__ == "__main__":

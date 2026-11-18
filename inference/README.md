@@ -1,6 +1,6 @@
 # Qwen 推理服务
 
-本页命令在 `inference/` 目录执行。H200 QSA/Muon 模型使用独立的 [serve_vllm_sglang_h200.sh](serve_vllm_sglang_h200.sh)，具体模式见 [QSA/Muon 方案](../docs/qsa_muon_35b_a3b.md)；下文 B300/RTX 入口服务原生 Qwen checkpoint。
+本页命令在 `inference/` 目录执行。已归档的 H200 QSA/Muon 模型脚本见 [archive/inference/serve_vllm_sglang_h200.sh](../archive/inference/serve_vllm_sglang_h200.sh) 与 [QSA/Muon 方案](../archive/docs/qsa_muon_35b_a3b.md)；下文 B300/RTX 入口服务原生 Qwen checkpoint。
 
 ## Qwen3.5-27B
 

@@ -1,79 +1,68 @@
-# CPT-SFT：Qwen 训练、推理与模型研究
+# CPT-SFT：Qwen3.5-27B 域适应（Lite / Flash / Pro）与 QA→CoT v0.3
 
-整理 Qwen3.5-27B 多阶段 LoRA SFT、35B-A3B 的 QSA/Muon 架构实验，以及 Qwen3.8-Flash-Next / Qwen3.5-27B 的训练与推理入口。
+围绕 **AutoVision 8×B300（`sm_103`）`Qwen3.5-27B`** 电商侵权 / IP 认知域适应战役，采用「**公共 B300 发射底盘 (`training/lib` + `training/cpt_27b`) + `Lite / Flash / Pro` 三阶段流水线**」架构；历史 H200 与 35B-A3B QSA/Muon 实验已整体归档至 [`archive/`](archive/README.md)。
 
-整个 `CPT-SFT/` 是一个 Git 仓库，对应 [qianlvguang/CPT-SFT](https://github.com/qianlvguang/CPT-SFT)。按用途分类，再在训练目录内区分模型和方案；模型权重、数据集、虚拟环境和运行产物单独存放。AI 编码代理在此仓库工作前请先阅读 [AGENTS.md](AGENTS.md)。
+![CPT-SFT Lite / Flash / Pro 全链路工作流程图](docs/training_plans/assets/cpt_sft_lite_flash_pro_workflow.png)
 
-## 目录
+> 整个 `CPT-SFT/` 是一个 Git 仓库，对应 [qianlvguang/CPT-SFT](https://github.com/qianlvguang/CPT-SFT)。AI 编码代理在此仓库工作前请先阅读 [AGENTS.md](AGENTS.md)。
+
+## 目录架构
 
 ```text
 CPT-SFT/
-├── AGENTS.md                # AI 编码代理工作约定与跨项目（Datawheel / OPD）互通说明
+├── AGENTS.md                        # AI 编码代理工作约定与跨项目（Datawheel / OPD）互通说明
 ├── training/
-│   ├── domain_adaptation/   # ✅ 当前 B300 主线：多模态 Wiki+RAG CPT、V1～V4 融入重构、Montessori QA 与统一编排（示例归入 examples/）
-│   ├── swift/               # 🧪 单模型独立 SFT 入口（Flash-Next B300 单独尝试与单卡 27B LoRA 入门）
-│   ├── qwen35_27b/          # 📦 历史 H200 归档基线（ms-swift 4.3.2，旧 V1～V4 三阶段纯 SFT；legacy/ 为更早 sweep）
-│   └── qsa_muon_35b_a3b/    # 🔬 独立架构探索实验（H200×8，35B-A3B QSA + Muon）
-├── inference/               # vLLM / SGLang 服务脚本
-├── environment/             # H200 依赖、CUDA/PyTorch 说明及环境脚本
+│   ├── lib/                         # B300 公共硬件层（_core.sh, hw_b300.sh: TP4/MBS4/GBS32, TE sm_103 预检）
+│   ├── cpt_27b/                     # 权威 B300 发射链（run_cpt_27b_b300.sh, train_cpt_qwen3_5_27b_megatron.sh）
+│   ├── lite/                        # Phase A：Lite 增益对照线（sch iso 12,085 行 / 9.55M tok, val0）
+│   ├── flash/                       # Phase B：Flash 全量 WSD 线 + QA→CoT v0.3 + 三方对照统一 SFT
+│   ├── pro/                         # Phase C：Pro 错例簇闭环（50/30/20 增量 + sft_overlap=0 + Montessori）
+│   └── swift/                       # 单模型独立 SFT 入口（Flash-Next B300 尝试与单卡 27B）
+├── archive/                         # 📦 历史归档（H200 V1～V4 推荐线、H200 纯文本草案、35B-A3B QSA/Muon）
+├── inference/                       # vLLM 0.32.0 B300 / RTX PRO 6000 服务脚本
+├── environment/                     # CUDA/PyTorch 架构检查与编译说明
 ├── docs/
-│   ├── model_guide/         # 模型结构、FP8/NVFP4、PLE 与权重检查
-│   ├── research_snapshots/  # 官方来源 revision、配置字段与内存推导
-│   ├── reports/             # JEV 多模态训练与量化方案报告
-│   ├── training_plans/      # 领域 CPT、推理制 QA、严谨引用风格 SFT
-│   └── history/             # 历史实验记录
-├── tools/                   # 权重头部读取、模块正则检查
-└── tests/                   # 调度回归测试、在线服务冒烟客户端
+│   ├── training_plans/
+│   │   ├── lite/                    # Phase A Runbook 与实测台账
+│   │   ├── flash/                   # Phase B 全量 WSD、QA→CoT v0.3 详案（含 v2.1 全链路图）与风格方案
+│   │   └── pro/                     # Phase C 错例闭环演进与 QAT/QLoRA 管理
+│   ├── model_guide/                 # 模型结构、FP8/NVFP4、PLE 与权重检查
+│   ├── research_snapshots/          # 官方来源 revision、配置字段与内存推导
+│   ├── reports/                     # JEV 多模态训练与量化方案报告
+│   └── history/                     # 历史实验记录
+├── tools/                           # 权重头部读取、模块正则检查与工作流渲染器
+└── tests/                           # 标准库单元测试与 Dry-Run 回归套件
 ```
 
-## 按任务选择入口
+## 按阶段选择入口
 
-| 任务 | 入口与说明 | 验证边界 |
+| 阶段 / 模块 | 核心代码与方案入口 | 验证边界 |
 |---|---|---|
-| **B300 27B 统一主线**（CPT+V1～V4+QA） | [目录说明](training/domain_adaptation/README.md)、[B300 多模态 CPT](docs/training_plans/b300_multimodal_wiki_rag_cpt_plan.md)、[V1～V4 重构](docs/training_plans/unified_v1_v4_cpt_qa_pipeline.md)、[一键编排](training/domain_adaptation/run_unified_b300_pipeline.sh)、[Montessori QA](training/domain_adaptation/montessori/README.md) | 6 通道构建、V1～V4 三元去重路由、B300 CPT 启动与端到端编排已通过本地单元测试与 `DRY_RUN=1`，尚未完成目标 B300 实训 |
-| 单模型独立 SFT（Flash-Next / 单卡 27B） | [SWIFT 独立入口](training/swift/README.md)（[Flash-Next B300](training/swift/train_b300_swift.sh) / [单卡 27B](training/swift/train_qwen35_27b_swift.sh)） | 单模型独立启动入口；目标硬件尚未验证 |
-| 历史 H200 27B 三阶段 SFT（归档） | [H200 归档基线](training/qwen35_27b/README.md)、[启动脚本](training/qwen35_27b/train_s1_s3_recommended.sh) | 调度器有标准库回归测试（`ms-swift 4.3.2`）；推荐数据组合尚未完成 H200 实训验证 |
-| 35B-A3B QSA + Muon（实验线） | [方案](docs/qsa_muon_35b_a3b.md)、[训练入口](training/qsa_muon_35b_a3b/run_cpt_sft_qsa_35a3_h200x8.sh) | 架构、算子与优化器需在目标环境验证 |
-| 在线推理 | [服务说明](inference/README.md)、[H200 QSA 服务](inference/serve_vllm_sglang_h200.sh) | B300/RTX 脚本固定 vLLM 0.32.0；实际权重与硬件需分别验证 |
-| 环境安装与检查 | [环境说明](environment/README.md) | 安装脚本按需运行，不随本地检查自动安装依赖 |
-| 模型与量化研究 | [模型指南](docs/model_guide/README.md)、[JEV 报告](docs/reports/qwen3_5_jev_multimodal_training_and_quantization_report.md) | 研究方案和报告中的估算不能视作实测结果 |
-| 历史复盘 | [训练进展日志](docs/history/progress_log.md)、[历史脚本](training/qwen35_27b/legacy/) | 日志中的远端路径、参数和评测保留历史含义 |
-
-这些方案对应不同模型、训练框架和并行配置。27B 推荐路线仍是 V1～V4 的一条固定配方；`legacy/` 中的 sweep 仅用于历史追溯。
-
-27B 的新增调研入口：[模型结构详解](docs/model_guide/qwen35_27b_architecture.md)、[量化方案与部署顺序](docs/model_guide/qwen35_27b_quantization.md)。其中明确区分官方 FP8 配置、NVFP4A16 工具示例、W4A4 的额外条件，以及自训模型尚待完成的验证。
-
-领域知识新增路线：[法规/文章/Wiki 原文 CPT](docs/training_plans/domain_cpt_plan.md) → [有证据的 QA 合成与 SFT](docs/training_plans/qa_synthesis_plan.md) → [严谨详尽、带依据引用的风格收尾](docs/training_plans/answer_style_sft_plan.md)。推理端同时保留可更新的检索来源，避免把引用外观当成引用正确。
-
-训练与管理补充：[27B QAT/QLoRA、WSD 收尾、新 Megatron 支持及文件管理](docs/training_plans/qwen35_27b_advanced_training_and_management.md)。含原生配置与薄启动器设计示例，已核对官方 release 元数据，尚未实现新启动器或在目标 GPU 验证。
+| **B300 权威发射链** | [`training/cpt_27b/run_cpt_27b_b300.sh`](training/cpt_27b/run_cpt_27b_b300.sh)（支持 `lite` / `stage1` / `stage2` / `pro`，默认 dry-run，传 `--launch` 实发） | 内置 `TP=4`、`MBS=4`、`GBS=32`、`--gradient_accumulation_fusion false`（APEX 修复）及 `TE sm_103` 预检；pod 卡 5 `TE` 前向已过 smoke，B300 全量实训按启动日志 `train_iters` 复核 |
+| **Phase A：Lite 增益对照** | [`training/lite/README.md`](training/lite/README.md)、[`build_cpt_from_sch.py`](training/lite/build_cpt_from_sch.py)、[Lite 战役 Runbook](docs/training_plans/lite/cpt_27b_runbook.md) | `sch iso`、`elements` 通道判别（修正 `label=True` 但 `elements=无` 假阳）、`val0` 与双臂外部 OOD SFT 编排已通过本地测试与 `DRY_RUN=1` |
+| **Phase B：Flash 全量 WSD + QA→CoT v0.3** | [`training/flash/README.md`](training/flash/README.md)、[`gen_cot_from_qa.py`](training/flash/gen_cot_from_qa.py)、[`build_mm_wiki_cpt.py`](training/flash/build_mm_wiki_cpt.py)、[QA→CoT v0.3 详案](docs/training_plans/flash/qa_cot_plan.md) | 八道质检门、同域干扰项混排重映射、冷酷核验风格三禁、`180/350/500` 硬下限、失败置空 `reasoning=""` 降级与 `8:2` 混配已通过本地 mock 测试与 `DRY_RUN=1` |
+| **Phase C：Pro 错例闭环演进** | [`training/pro/README.md`](training/pro/README.md)、[`error_cluster_miner.py`](training/pro/error_cluster_miner.py)、[`montessori/`](training/pro/montessori/README.md)、[Pro 闭环方案](docs/training_plans/pro/pro_closed_loop_plan.md) | 四类错例归因（固定权重补索引/改路由门控）、`50/30/20` 增量构建、`sft_overlap=0` 隔离与 Montessori 探针已通过本地单元测试与 `DRY_RUN=1` |
+| **单模型独立 SFT / 在线推理** | [`training/swift/`](training/swift/README.md)、[`inference/`](inference/README.md) | 独立 `Flash-Next` / 单卡 `27B` 入口及 vLLM 0.32.0 推理脚本 |
+| **📦 历史归档（H200 / QSA）** | [`archive/README.md`](archive/README.md) | 原 H200 V1～V4 推荐线（`test_recommended_pipeline.py` 9/9 通过）与 35B-A3B QSA/Muon 实验 |
 
 ## 跨项目生态互通（Datawheel × OPD × CPT-SFT）
 
 | 联动项目 | 相对路径 | 协同职责与数据流 |
 |---|---|---|
-| **Datawheel** | [`../Datawheel/`](../Datawheel/README.md) | 为 27B 中训练提供 `variant=6`（`loss_V6`）细粒度视觉定位与参考图匹配数据；通过 [`diagnose_and_refill_v6.py`](../Datawheel/tools/diagnose_and_refill_v6.py) 将 VLM 知识缺口与 BBox 失准样本转化为本仓库可直接训练的多模态 DPO/KTO/SFT 数据集 |
-| **OPD** | [`../OPD/`](../OPD/README.md) | 提供 ToDi 前/反向双通道 KL 蒸馏、闭源 API 桥接自蒸馏（[`bsd_api_bridge.py`](../OPD/bsd_api_bridge.py)）、深度特化正交 LoRA 路由（[`depth_lora_router.py`](../OPD/depth_lora_router.py)）、多模态图文对齐诊断引擎（[`multimodal_datawheel_bridge.py`](../OPD/multimodal_datawheel_bridge.py)）及 **[全域监控面板 HTML](../OPD/dashboard.html)** |
+| **Datawheel** | [`../Datawheel/`](../Datawheel/README.md) | 为 27B 中训练提供 `variant=6`（`loss_V6`）细粒度视觉定位与参考图匹配数据；通过 [`diagnose_and_refill_v6.py`](../Datawheel/tools/diagnose_and_refill_v6.py) 反哺多模态 DPO/KTO/SFT 与 Pro 阶段定向补采 |
+| **OPD** | [`../OPD/`](../OPD/README.md) | 提供 ToDi 前/反向双通道 KL 蒸馏、闭源/异构 API 桥接自蒸馏（[`bsd_api_bridge.py`](../OPD/bsd_api_bridge.py)）、深度特化正交 LoRA 路由（[`depth_lora_router.py`](../OPD/depth_lora_router.py)）、多模态对齐诊断与 **[全域监控面板](../OPD/dashboard.html)** |
 
-## 本地检查
-
-以下命令从仓库根目录执行，不启动 GPU 训练或下载模型：
+## 本地检查（无 GPU / 零下载）
 
 ```bash
-python3 tests/test_recommended_pipeline.py
-python3 tests/test_montessori_pipeline.py
-python3 tests/test_b300_mm_cpt_pipeline.py
-python3 tests/test_unified_v1_v4_pipeline.py
-bash training/qwen35_27b/train_s1_s3_recommended.sh plan
-DRY_RUN=1 bash training/domain_adaptation/montessori/run_montessori_pipeline.sh
-DATASET=training/swift/examples/example_sft.jsonl DRY_RUN=1 bash training/swift/train_qwen35_27b_swift.sh
-DATASET=training/swift/examples/example_sft.jsonl DRY_RUN=1 bash training/swift/train_b300_swift.sh
-DATASET=training/domain_adaptation/examples/cpt_mm_6ch_example.jsonl DRY_RUN=1 bash training/domain_adaptation/train_qwen35_27b_cpt_b300.sh
-DEMO=1 DRY_RUN=1 bash training/domain_adaptation/run_unified_b300_pipeline.sh
+python3 tests/test_lite_flash_pro_architecture.py -v
+python3 tests/test_b300_mm_cpt_pipeline.py -v
+python3 tests/test_unified_v1_v4_pipeline.py -v
+python3 tests/test_montessori_pipeline.py -v
+python3 tests/test_recommended_pipeline.py -v
+DEMO=1 DRY_RUN=1 bash training/lite/run_lite_pipeline.sh
+DEMO=1 DRY_RUN=1 bash training/flash/run_flash_pipeline.sh
+DEMO=1 DRY_RUN=1 bash training/pro/run_pro_pipeline.sh
+bash training/cpt_27b/run_cpt_27b_b300.sh lite --model /data/autovision-cfs/autovision-notebook/algo4/models/Qwen3.5-27B
 DRY_RUN=1 bash inference/serve_qwen35_27b.sh
 ```
-
-推理启动脚本的 dry-run 仍会创建缓存和模型目录，可通过 `HF_CACHE`、`MODEL_DIR` 指定位置。连接真实服务的客户端位于 [tests/smoke_test.py](tests/smoke_test.py)，需等目标服务启动后另行运行。
-
-## 目录迁移
-
-2026-11-08 将原嵌套仓库提升到整个 `CPT-SFT/`，保留原有 Git 提交历史，并将父目录的 27B 脚本纳入同一工作树。新旧路径对照见 [目录迁移说明](docs/repository_layout.md)。

@@ -1,37 +1,43 @@
-# 领域知识、CPT 与 QA/风格训练方案总览
+# 领域知识、CPT 与 QA/CoT 训练方案总览
 
-围绕实际线上 IP 审核模板和人审 ACC 的新一轮设计见 [Lite、Flash 与 Pro 工作流程](online_ip_template_cpt.md)。
+围绕实际线上 IP 审核模板与 AutoVision 8×B300（`sm_103`）战役，当前方案按 **Lite（增益对照） → Flash（全量 WSD + QA→CoT v0.3） → Pro（错例闭环 + Montessori）** 三档分文件夹组织，历史 H200 / QSA 实验已归档至 [`archive/`](../../archive/README.md)。
 
-> **阅读导航**：为避免早期草案与当前主线混淆，本目录按**「当前 B300 统一主线 → 下游 QA/风格专题 → 早期草案与硬件调研归档」**分层组织。
+![CPT-SFT Lite / Flash / Pro 全链路工作流程图](assets/cpt_sft_lite_flash_pro_workflow.png)
 
-## 一、当前 B300 统一主线（优先阅读）
-
-面向 `Qwen3.5-27B`（8×B300），配合 `Qwen3.8-Flash-Next` RAG 检索中枢与 `Qwen-Image 2.1` 生图/反事实管线；可执行代码与示例位于 [`training/domain_adaptation/`](../../training/domain_adaptation/README.md)：
+- 三档工作流程总纲：[Lite、Flash 与 Pro 工作流程](online_ip_template_cpt.md)
+- 前序 v2.1 6 通道 WSD 管线图（Flash 阶段细节）：[`flash/assets/b300_27b_cpt_sft_pipeline.png`](flash/assets/b300_27b_cpt_sft_pipeline.png)
 
 ```mermaid
-flowchart TD
-    V14["历史 V1～V4 数据池<br>(refactor_v1_v4_pipeline.py)"] --> CPT_DATA["6 通道多模态 CPT 分片<br>(build_mm_wiki_cpt.py)"]
-    WIKI["纯文本 Wiki/法规 + Logo/国旗 + 爬取图<br>+ Qwen-Image 2.1 + Flash-Next RAFT"] --> CPT_DATA
-    CPT_DATA --> CPT_RUN["两阶段 WSD CPT<br>(train_qwen35_27b_cpt_b300.sh)"]
-    CPT_RUN -->|"合并导出 BF16 HF"| SFT_RUN["V1～V4 Token 重平衡 + 新 QA/RAG 统一 SFT<br>(run_unified_b300_pipeline.sh)"]
-    MON["Montessori QA 合成 + 引用风格改写"] --> SFT_RUN
+flowchart LR
+    LITE["Phase A: Lite 增益对照<br>training/lite/ + cpt_27b/<br>(sch iso 12,085 行 / 9.55M tok)"] -->|"增益确认"| FLASH["Phase B: Flash 全量 WSD + QA→CoT v0.3<br>training/flash/ + cpt_27b/<br>(6+2 通道 WSD + 8道门 CoT)"]
+    FLASH -->|"全量验收基线"| PRO["Phase C: Pro 错例闭环<br>training/pro/ + OPD/Datawheel<br>(50/30/20 增量 + Montessori)"]
 ```
 
-| 方案 | 解决什么问题 |
+## 一、Phase A：Lite 增益对照 ([`lite/`](lite/README.md))
+
+| 文档 / 脚本 | 解决什么问题 |
 |---|---|
-| [B300 双模型多模态 Wiki+RAG CPT](b300_multimodal_wiki_rag_cpt_plan.md) | B300 上 27B vs Flash-Next 训练可行性评估、Qwen-Image 2.1 生图/反事实、6 通道配比与 WSD 课程 |
-| [V1～V4 融入 CPT 与统一 QA-SFT 重构方案](unified_v1_v4_cpt_qa_pipeline.md) | 历史 V1～V4 三元去重分流进 CPT 回放/RAFT，及与新 QA 按监督 Token 重平衡接入统一 SFT |
+| [CPT-27B 战役 Runbook（lite 增益对照线）](lite/cpt_27b_runbook.md) | 实测 `bundle_lite_v3_all·val0`（12,085 行 / 9.55M tok）、`sch iso` 改造规则、APEX/TE `sm_103` 排雷与双臂外部 OOD SFT 对照 |
+| [`training/lite/build_cpt_from_sch.py`](../../training/lite/build_cpt_from_sch.py) | `sch` 原子自拼、`elements` 通道判定、`T1_FULL` KB 筛选与 `val0` 构建 |
+| [`training/cpt_27b/run_cpt_27b_b300.sh`](../../training/cpt_27b/run_cpt_27b_b300.sh) | 权威 B300 统一发射入口（`lite` / `stage1` / `stage2` / `pro`，默认 dry-run，`--launch` 实发） |
 
-## 二、下游 QA 合成与风格收尾专题
+## 二、Phase B：Flash 全量 WSD 与 QA→CoT v0.3 ([`flash/`](flash/README.md))
 
-| 方案 | 解决什么问题 |
+| 文档 | 解决什么问题 |
 |---|---|
-| [推理生成 QA](qa_synthesis_plan.md) | 如何从来源生成题目、程序/独立核验与导出 Montessori SFT/DPO/KTO 数据 |
-| [回答风格 SFT](answer_style_sft_plan.md) | 如何学习严谨详尽、带 `[S1]` 依据引用的回答习惯（推理端配合可更新 RAG 库） |
+| [QA→CoT 逆向桥接详案（v0.3）](flash/qa_cot_plan.md) | 227,656 条 `qa_kb_raw.jsonl`、`qwen3.8-flash`（thinking ≥ 2048）、冷酷核验风格三禁、八道质检门、动态长度下限硬门（180/350/500）与 8:2 三方对照 |
+| [B300 双模型多模态 Wiki+RAG CPT](flash/b300_multimodal_wiki_rag_cpt_plan.md) | 27B vs Flash-Next 可行性、TP4/DP2 GQA 整除约束、全量多通道 WSD 与 Qwen-Image 2.1 反事实规范 |
+| [V1～V4 融入 CPT 与统一 QA-SFT 重构方案](flash/unified_v1_v4_cpt_qa_pipeline.md) | 历史 V1～V4 三元去重分流进 CPT 回放/RAFT，及三方 SFT 监督 Token 重平衡 |
+| [推理生成 QA](flash/qa_synthesis_plan.md) | 源文档驱动 QA 合成、程序偏移/Hash 核验与独立语义验证 |
+| [回答风格 SFT](flash/answer_style_sft_plan.md) | 严谨详尽、带 `[S1]` 依据引用的机构化回答规范与 2000 条风格收尾 |
 
-## 三、早期设计基线与专项硬件调研（归档参考）
+## 三、Phase C：Pro 错例闭环演进 ([`pro/`](pro/README.md))
 
-| 方案 | 定位说明 |
+| 文档 | 解决什么问题 |
 |---|---|
-| [早期原文 CPT 草案](domain_cpt_plan.md) | 2026-11-08 针对 H200×8 纯文本 100M 原型草案；B300 多模态 Wiki+RAG 落地已被第一部分两篇方案演进替代，保留其中文档登记与切块通用准则 |
-| [27B 进阶训练与管理](qwen35_27b_advanced_training_and_management.md) | QAT、NF4 QLoRA、WSD 公式与新 Megatron 堆栈调研参考 |
+| [Pro 错例簇闭环演进方案](pro/pro_closed_loop_plan.md) | 四类错例归因（固定权重补索引/改路由优先）、50/30/20 增量 CPT、`sft_overlap=0` 隔离与 Montessori / OPD / Datawheel 闭环 |
+| [27B 进阶训练与管理](pro/qwen35_27b_advanced_training_and_management.md) | QAT、NF4 QLoRA、WSD 公式与新 Megatron 堆栈调研参考 |
+
+## 四、历史归档 ([`archive/`](../../archive/README.md))
+
+- H200 `ms-swift 4.3.2` 三阶段 V1～V4 推荐线、H200 纯文本 CPT 草案及 35B-A3B QSA/Muon 实验均已归档至 [`archive/`](../../archive/README.md)。

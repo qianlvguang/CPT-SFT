@@ -10,7 +10,8 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MONTESSORI_DIR = REPO_ROOT / "training" / "domain_adaptation" / "montessori"
+FLASH_DIR = REPO_ROOT / "training" / "flash"
+MONTESSORI_DIR = REPO_ROOT / "training" / "pro" / "montessori"
 sys.path.insert(0, str(MONTESSORI_DIR))
 
 import api_preference_synthesizer  # noqa: E402
@@ -21,9 +22,9 @@ import probing_generate  # noqa: E402
 
 class MontessoriPipelineTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.sources_path = REPO_ROOT / "training" / "domain_adaptation" / "examples" / "source_documents_example.jsonl"
-        self.prompt_path = REPO_ROOT / "training" / "domain_adaptation" / "prompts" / "qa_generate.md"
-        self.ref_path = REPO_ROOT / "training" / "domain_adaptation" / "examples" / "style_sft_example.jsonl"
+        self.sources_path = FLASH_DIR / "examples" / "source_documents_example.jsonl"
+        self.prompt_path = FLASH_DIR / "prompts" / "qa_generate.md"
+        self.ref_path = FLASH_DIR / "examples" / "style_sft_example.jsonl"
 
     def test_stage1_probing_generation_and_exact_quote_validation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
