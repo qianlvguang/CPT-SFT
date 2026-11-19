@@ -101,21 +101,18 @@ Phase C（长期演进）  Pro 错例闭环
 
 ---
 
-## 3. 运行配方（Lite 最终版）
+## 3. 运行配方（v2.0 校准版 —— 解决 B300 `7 steps` 崩溃）
 
-| 参数 | 值 | 备注 |
-|---|---|---|
-| 数据 | `bundle_lite_v3_all·val0`（12,085 行 / 9.55M tok） | compat symlink 供 wrapper |
-| epochs | **2**（`LITE_EPOCHS`） | ≈36.4 步 → 预期 `train_iters ≈ 36` |
-| LR | `constant` 恒 `1e-5` + warmup `6%` | lite 不做 WSD 退火 |
-| 并行 | `TP4 × DP2 = 8 卡` | B300 适配（GQA `KV=4` 禁设 `TP=8`） |
-| MBS / GBS / seq | **4** / 32 / 16384 | B300 显存充裕，MBS 基线从 1 提至 4 |
-| attention | `flash`（16384） | 预检不过时 `ATTENTION_BACKEND=unfused` 覆盖（不覆盖 TE RMSNorm） |
-| 冻结策略 | `freeze_vit=true` / `freeze_aligner=false`（`ALIGNER_LR=2e-6`） | |
-| 正则 | `wd=0.1` / `clip=1.0` / `mtp_num_layers=0` | |
-| fusion | `--gradient_accumulation_fusion false` | APEX 地雷修复，默认关闭 |
-| 输出 | `algo4/tpz/fine-tunning/cpt-qwen3_5-27b-lite-v1.0.0/stage1` | |
-| OOM 降档 | `MICRO_BATCH_SIZE=2` 或 `1` | 预案保留 |
+> **v1.0 `tqdm 0/7` 根因复盘**：`bundle_lite_v3_all` 中 11,502/12,085（95.2%）均为 `sch` 短行（约 50 字 + 缩略图 ≈ **150 tok/行**，远低于离线高估的 790 tok/行），1 epoch 真实总 token 仅 `~1.83M`；叠加 `GBS=32 × MAX_LENGTH=16384 = 524,288 tok/step`，2 epochs 仅得 `(1.83M × 2) / 524,288 = 7.0 steps`！同时 16K 打包过度吞并短行、若降成 4K 又会截断 4K–8K KB 文本。
+> **v2.0 修复**：1. Lite 默认改由 [`training/lite/slice_flash_to_lite.py`](../../../training/lite/slice_flash_to_lite.py) 从 Flash 4 桶池按 `doc_family_id` 整家族按比例切片 **15%**（`val0`，不含原始 `<think>` ChatML）；2. B300 Lite 收窄为 **`MBS=1 / GBS=4 / MAX_LENGTH=8192`**（`32,768 tok/step` → 稳定 **~100–150 steps**，兼顾 8K 完整文本留存）。
+
+| 参数 | v1.0（已废弃，`7 steps`） | v2.0（当前校准版） | 备注 |
+|---|---|---|---|
+| 数据源 | `bundle_lite_v3_all` (95% `sch`) | `bundle_lite/lite_train.jsonl` (15% Flash 4 桶切片) | `bundle_lite_compat/stage1_train.jsonl` 软链兼容；`LITE_MODE=sch_legacy` 仍保留 |
+| epochs / SAVE | `2` / `SAVE_STEPS=128` | **`2`** / **`SAVE_STEPS=40`** | 投影步数 `~100–150` 步，`~40` 步留 1 档中间 checkpoint |
+| LR | `constant 1e-5` | **`constant 8e-6`** + warmup `6%` | `TP4 × DP2`，冻结 ViT、保留 Aligner (`2e-6`) |
+| MBS / GBS / seq | `4 / 32 / 16384` (524K/step) | **`1 / 4 / 8192`** (**32.8K/step**) | Flash/Pro 统一用 `2 / 16 / 8192`（131K/step） |
+| attention / fusion | `flash` / `--gradient_accumulation_fusion false` | 同左 | APEX 地雷关闭、TE `sm_103` 混搭不变 |
 
 **B300 显存账**：27B 全参 TP4 DP2 + dist-opt ≈ 67.5 GB/卡 → 余 ~201–207 GB/卡激活；MBS4×16384 经 TP4 分摊 = 每卡 16K tok/micro-batch，余量充裕。
 
@@ -125,10 +122,11 @@ Phase C（长期演进）  Pro 错例闭环
 
 | 文件 | 角色 |
 |---|---|
-| [`training/cpt_27b/run_cpt_27b_b300.sh`](../../../training/cpt_27b/run_cpt_27b_b300.sh) | wrapper：支持 `lite` / `stage1` / `stage2` / `pro`；缺省 dry-run，`--launch` 才实发；`--model` 必填门禁 |
+| [`training/lite/slice_flash_to_lite.py`](../../../training/lite/slice_flash_to_lite.py) | Flash 4 桶池整家族 `15%` 按比例分层切片 + B300 `MBS=1/GBS=4/8192` 步数自检（`<60` 步告警） |
+| [`training/cpt_27b/run_cpt_27b_b300.sh`](../../../training/cpt_27b/run_cpt_27b_b300.sh) | wrapper：支持 `lite` / `flash` / `pro` / `pro_inc` / 兼容 `stage1`/`stage2`；缺省 dry-run，`--launch` 才实发 |
 | [`training/cpt_27b/train_cpt_qwen3_5_27b_megatron.sh`](../../../training/cpt_27b/train_cpt_qwen3_5_27b_megatron.sh) | 薄壳（含 `--gradient_accumulation_fusion false`；纪律：`train_iters` 偏差 >10% 杀掉重发登记） |
 | [`training/lib/_core.sh`](../../../training/lib/_core.sh) | 公共层（日志、命令打印、`DRY_RUN` / `--launch` 门禁） |
-| [`training/lib/hw_b300.sh`](../../../training/lib/hw_b300.sh) | B300 硬件层（`DEF_MICRO_BATCH_SIZE=4`、`TP_SIZE` 整除校验、TE `sm_103` 预检函数） |
+| [`training/lib/hw_b300.sh`](../../../training/lib/hw_b300.sh) | B300 硬件层（默认 `DEF_MICRO_BATCH_SIZE=2, DEF_GLOBAL_BATCH_SIZE=16, DEF_MAX_LENGTH=8192`、`TP_SIZE` 整除校验、TE `sm_103` 预检） |
 
 ---
 
@@ -152,6 +150,6 @@ Phase C（长期演进）  Pro 错例闭环
 
 ### 5.3 重发验证清单
 
-1. 执行集群发射命令（NFS venv 修复即时生效）；
-2. **核对启动日志 `train_iters ≈ 36`**——排查上次 crash log `tqdm 0/7` 差异，偏差 >10% 立即停机登记；
-3. 观察首步 forward 过 GDN RMSNorm 且 MBS=4 显存峰值正常（预期参数+优化器 ~67.5 GB/卡 + 激活余量充足）。
+1. 执行 `run_cpt_27b_b300.sh lite --launch`（默认走 `MBS=1 / GBS=4 / 8192`）；
+2. **核对启动日志 `train_iters >= 80`（目标 `100–150` 步）**——若仍出现个位数 steps 立即停机检查 `GBS` 或切片总量；
+3. 双臂 OOD SFT 后同时评测 `enable_thinking=true` 与 `enable_thinking=false` 两档指标，确保无 Thinking-OFF 塌陷。

@@ -166,11 +166,14 @@ class UnifiedV1V4PipelineTests(unittest.TestCase):
                     check=True,
                 )
                 self.assertIn("megatron pt", proc.stdout)
+                self.assertIn("--lr_decay_style WSD", proc.stdout)
+                self.assertIn("--max_length 8192", proc.stdout)
                 self.assertIn("swift export", proc.stdout)
                 self.assertIn("megatron sft", proc.stdout)
-                self.assertTrue((work_dir / "step0_qa_cot_v03" / "cot_manifest.json").exists())
+                self.assertTrue((work_dir / "step0_qa_cot_v04" / "cot_manifest.json").exists())
+                self.assertTrue((work_dir / "step0_v2_images" / "v2_pipeline_manifest.json").exists())
                 self.assertTrue((work_dir / "step1_v1_v4_refactored" / "refactor_manifest.json").exists())
-                self.assertTrue((work_dir / "step2_cpt_bundle" / "manifest.json").exists())
+                self.assertTrue((work_dir / "step2_midtrain_bundle" / "midtrain_manifest.json").exists())
 
     def test_three_sft_comparison_arms(self) -> None:
         raw_rows = [(r, self.v1_v4_sample) for r in cpt_builder.load_jsonl(self.v1_v4_sample)]

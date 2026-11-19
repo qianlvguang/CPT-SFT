@@ -10,15 +10,15 @@
 
 ```mermaid
 flowchart LR
-    DW["Coding/Datawheel<br>多模态商品与图元合成飞轮 (V6 通道)"] <-->|"1. 供给 V6 训练集<br>2. 接收知识缺口与 BBox 失准重采样处方"| OPD["Coding/OPD<br>知识(ToDi)+技能(反KL)+桥接(BSD)+多模态诊断"]
-    OPD <-->|"共享局部影响探针、API 黑盒引导与 DPO/KTO/GRPO 数据契约"| CS["Coding/CPT-SFT<br>B300 27B Lite/Flash/Pro + QA→CoT v0.3 + Montessori"]
+    DW["Coding/Datawheel<br>多模态商品与图元合成飞轮 (V6 通道 + Qwen-Image-2.1 规范)"] <-->|"1. 供给 V6 与 263万 v-bank 实拍<br>2. 接收 Pro 错例重采样处方"| OPD["Coding/OPD<br>ToDi 双通道 KL + BSD 闭源桥接 + Think-ON->OFF 蒸馏"]
+    OPD <-->|"Pro 导出 pro_opd_bsd_seeds.jsonl + 学生 DPO/KTO 契约"| CS["Coding/CPT-SFT<br>B300 27B 同源 Lite/Flash/Pro + CoT v0.4 + ImageGen v2"]
     DW -->|"variant=6 (loss_V6) 接入统一 SFT"| CS
 ```
 
 | 关联项目 | 相对路径 | 互通接口与数据契约 |
 |---|---|---|
-| **`Coding/Datawheel`** | `../Datawheel/` | 1. **训练输入**：Datawheel 导出的 V6 parquet（`messages / images / enable_thinking / sample_id / cate_id / variant=6`）接入 [`training/flash/refactor_v1_v4_pipeline.py`](training/flash/refactor_v1_v4_pipeline.py) 统一 SFT。<br>2. **边查验边造数**：Datawheel 的 [`tools/diagnose_and_refill_v6.py`](../Datawheel/tools/diagnose_and_refill_v6.py) 导出 `vlm_datawheel_{sft,dpo,kto}.jsonl`，可直接传给 [`training/swift/train_qwen35_27b_swift.sh`](training/swift/train_qwen35_27b_swift.sh) 或 [`training/pro/montessori/train_teacher_dpo_swift.sh`](training/pro/montessori/train_teacher_dpo_swift.sh)。 |
-| **`Coding/OPD`** | `../OPD/` | 1. **在线蒸馏与闭源 API 桥接**：[`training/pro/montessori/`](training/pro/montessori/README.md) 产出的 `student_grpo_prompts.jsonl` 与 [`training/flash/gen_cot_from_qa.py`](training/flash/gen_cot_from_qa.py) 的 API CoT 轨迹，可交由 `../OPD/bsd_api_bridge.py` 执行桥接自蒸馏（BSD），或由 `../OPD/kl_objectives.py` 执行 ToDi 双通道 KL 蒸馏。<br>2. **深度特化 LoRA 路由**：`../OPD/depth_lora_router.py` 生成的 `--target_regex` 可直接传入本仓库 `training/swift/train_*.sh` 的 `LORA_SCOPE=regex TARGET_REGEX=...`。 |
+| **`Coding/Datawheel`** | `../Datawheel/` | 1. **训练与生图契约**：Datawheel 导出的 V6 parquet 接入 [`training/flash/refactor_v1_v4_pipeline.py`](training/flash/refactor_v1_v4_pipeline.py)；[`training/flash/build_v2_image_pipeline.py`](training/flash/build_v2_image_pipeline.py) 对齐 `Datawheel/docs/QWEN_IMAGE_2_1_PIPELINE.md` 的 Edit/I2I 与 VLM/OCR 门禁。<br>2. **边查验边造数**：`tools/diagnose_and_refill_v6.py` 输出反哺 Pro 多模态 DPO/KTO 与定向补采。 |
+| **`Coding/OPD`** | `../OPD/` | 1. **Think-ON→OFF 上下文蒸馏与闭源桥接**：[`training/pro/enhance_flash_to_pro.py`](training/pro/enhance_flash_to_pro.py) 导出 `pro_opd_bsd_seeds.jsonl`（`think_on_to_off_context_distill`）与 `pro_dpo_kto_pairs.jsonl`，交由 `../OPD/bsd_api_bridge.py` 与 `../OPD/kl_objectives.py` 对齐无思考低延迟部署表现。<br>2. **深度特化 LoRA 路由**：`../OPD/depth_lora_router.py` 的 `--target_regex` 可直接接入 `training/swift/train_*.sh`。 |
 
 ---
 
@@ -26,59 +26,42 @@ flowchart LR
 
 | 目录 | 职责 | 关键入口 |
 |---|---|---|
-| `training/lib/` & `training/cpt_27b/` | **B300 公共层与权威发射底盘**：固化 `TP=4`、`MBS=4`、`GBS=32`、`--gradient_accumulation_fusion false`（APEX 修复）、TE `sm_103` 预检与 `--launch` 门禁 | [`training/lib/_core.sh`](training/lib/_core.sh)、[`training/lib/hw_b300.sh`](training/lib/hw_b300.sh)、[`training/cpt_27b/run_cpt_27b_b300.sh`](training/cpt_27b/run_cpt_27b_b300.sh)、[`training/cpt_27b/train_cpt_qwen3_5_27b_megatron.sh`](training/cpt_27b/train_cpt_qwen3_5_27b_megatron.sh) |
-| `training/lite/` | **Phase A（Lite 增益对照线）**：`sch` 96 模板 iso 改造（以 `elements` 判通道并将 `label` 降级为审计字段）、`bundle_lite_v3_all·val0` 与双臂外部 OOD SFT 对照 | [`training/lite/build_cpt_from_sch.py`](training/lite/build_cpt_from_sch.py)、[`training/lite/run_lite_pipeline.sh`](training/lite/run_lite_pipeline.sh) |
-| `training/flash/` | **Phase B（Flash 全量 WSD + QA→CoT v0.3）**：全量 WSD 两阶段构建（含 `sch v2.3` 并入）、QA→CoT v0.3 八道门控与直答降级、三方对照统一 SFT | [`training/flash/build_mm_wiki_cpt.py`](training/flash/build_mm_wiki_cpt.py)、[`training/flash/gen_cot_from_qa.py`](training/flash/gen_cot_from_qa.py)、[`training/flash/refactor_v1_v4_pipeline.py`](training/flash/refactor_v1_v4_pipeline.py)、[`training/flash/run_flash_pipeline.sh`](training/flash/run_flash_pipeline.sh) |
-| `training/pro/` | **Phase C（Pro 错例闭环演进）**：四类错例归因（固定权重补索引/改路由门控）、`50/30/20` 增量 CPT、`sft_overlap=0` 隔离与 Montessori-Instruct 闭环 | [`training/pro/error_cluster_miner.py`](training/pro/error_cluster_miner.py)、[`training/pro/run_pro_pipeline.sh`](training/pro/run_pro_pipeline.sh)、[`training/pro/montessori/run_montessori_pipeline.sh`](training/pro/montessori/run_montessori_pipeline.sh) |
-| `training/swift/` | **单模型独立 SFT 入口**：`Qwen3.8-Flash-Next` B300 单独 LoRA 尝试与单卡 27B SFT | [`training/swift/train_qwen35_27b_swift.sh`](training/swift/train_qwen35_27b_swift.sh)、[`training/swift/train_b300_swift.sh`](training/swift/train_b300_swift.sh) |
-| `archive/` | **历史归档**：已退出的 H200 `ms-swift 4.3.2` 三阶段推荐线与 35B-A3B QSA/Muon 实验 | [`archive/README.md`](archive/README.md) |
-| `docs/training_plans/` | **按阶段分目录的方案文档**：`lite/`、`flash/`、`pro/` 与总纲 `online_ip_template_cpt.md` | [`docs/training_plans/README.md`](docs/training_plans/README.md) |
-| `tools/` & `tests/` | Safetensors 检查、正则检查、工作流渲染及全套标准库回归测试 | [`tests/test_lite_flash_pro_architecture.py`](tests/test_lite_flash_pro_architecture.py)、[`tests/test_b300_mm_cpt_pipeline.py`](tests/test_b300_mm_cpt_pipeline.py) |
+| `training/lib/` & `training/cpt_27b/` | **B300 校准发射底盘**：全局 `MAX_LENGTH=8192`、`TP=4`、`--gradient_accumulation_fusion false`（APEX 修复）、TE `sm_103` 预检；支持 `lite` (`MBS=1/GBS=4`)、`flash` (`WSD linear, MBS=2/GBS=16`)、`pro` (`6e-6`)、`pro_inc` (`cosine 5e-6`) 与兼容 `stage1`/`stage2` | [`training/lib/hw_b300.sh`](training/lib/hw_b300.sh)、[`training/cpt_27b/run_cpt_27b_b300.sh`](training/cpt_27b/run_cpt_27b_b300.sh)、[`training/cpt_27b/train_cpt_qwen3_5_27b_megatron.sh`](training/cpt_27b/train_cpt_qwen3_5_27b_megatron.sh) |
+| `training/lite/` | **Phase A（Lite 按比例切片对照）**：默认从 Flash 四桶 Mid-Training 池整家族按 `15%` 切片（`val0`）避免 7-step 崩溃；保留 `LITE_MODE=sch_legacy` 兼容 | [`training/lite/slice_flash_to_lite.py`](training/lite/slice_flash_to_lite.py)、[`training/lite/build_cpt_from_sch.py`](training/lite/build_cpt_from_sch.py)、[`training/lite/run_lite_pipeline.sh`](training/lite/run_lite_pipeline.sh) |
+| `training/flash/` | **Phase B（Flash 3 步骨干）**：CoT v0.4 知识内化 + `Clean Direct Twins` + `qa_midtrain_prose`；ImageGen v2 按域分区多图打包；单阶段 30/35/15/20 WSD Mid-Training（`synth<=25%`, `qa_prose<=15%`, zero raw ChatML/<think> in pt）；单轮双模 SFT | [`training/flash/gen_cot_from_qa.py`](training/flash/gen_cot_from_qa.py)、[`training/flash/build_v2_image_pipeline.py`](training/flash/build_v2_image_pipeline.py)、[`training/flash/build_mm_wiki_cpt.py`](training/flash/build_mm_wiki_cpt.py)、[`training/flash/refactor_v1_v4_pipeline.py`](training/flash/refactor_v1_v4_pipeline.py)、[`training/flash/run_flash_pipeline.sh`](training/flash/run_flash_pipeline.sh) |
+| `training/pro/` | **Phase C（Pro 同源程序增强 + 多轮演化）**：复用 Flash 原始池执行 4 项程序增强（密度筛选、跨模态对齐、双模 Canary + WiSE-FT `0.8*CPT+0.2*Base`、学生 DPO/KTO + OPD Think-OFF 蒸馏）+ 多轮单调账本 `iteration_ledger.json`（`sft_overlap=0`） | [`training/pro/enhance_flash_to_pro.py`](training/pro/enhance_flash_to_pro.py)、[`training/pro/error_cluster_miner.py`](training/pro/error_cluster_miner.py)、[`training/pro/run_pro_pipeline.sh`](training/pro/run_pro_pipeline.sh) |
+| `training/swift/` & `archive/` | 单卡 / Flash-Next 独立 SFT 入口；H200 / QSA 历史归档 | [`archive/README.md`](archive/README.md) |
+| `docs/training_plans/` & `tools/` & `tests/` | 分层方案文档、工作流图渲染器与标准库全量测试 | [`docs/training_plans/README.md`](docs/training_plans/README.md) |
 
 ---
 
 ## 3. 编码与工程铁律
 
-1. **零硬编码本机路径**：
-   - Python 脚本统一使用 `Path(__file__).resolve().parent...` 定位仓库内资源；
-   - Shell 脚本统一使用 `SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"` 及环境变量覆盖（如 `WORK_DIR`、`DATASET`、`MODEL`、`OUTPUT_DIR`、`AUTOVISION_ROOT`）。
-2. **所有训练/服务脚本默认安全 Dry-Run（`DRY_RUN=1` / 缺省无 `--launch`）**：
-   - 在无 GPU 的开发机或 CI 环境中，`DRY_RUN=1`（或 `run_cpt_27b_b300.sh` 未传 `--launch`）必须能够打印完整可执行命令并正常退出（exit code 0），不得触发模型下载或显存分配。
-3. **数据防泄漏、硬核验与降级零污染**：
-   - `doc_family_id` 与 `template_family_id` 必须严格隔离（Pro 阶段强制断言 `sft_overlap == 0`）；
-   - `sch` 改造必须以 `elements` 实际内容判通道（`label` 降级为审计字段）；
-   - QA→CoT v0.3 未通过八道门的样本严禁拼接 Quote 兜底，必须置 `reasoning=""` 且 `enable_thinking=false` 降级至直答桶。
-4. **不将权重、大体积数据或运行临时目录纳入 Git**：
-   - 测试或演示生成的临时目录（如 `output_demo/`、`__pycache__/`）在提交前必须清理干净。
+1. **零硬编码本机路径**；Python 使用 `Path(__file__).resolve().parent...`，Shell 使用 `SCRIPT_DIR` 与环境变量覆盖。
+2. **默认安全 Dry-Run（`DRY_RUN=1` / 缺省不传 `--launch`）**。
+3. **防泄漏、防 Thinking-OFF 崩溃与防 CPT QA 污染**：
+   - `doc_family_id` / `template_family_id` 在跨阶段与多轮账本中单调累计隔离，强制 `sft_overlap == 0` 与 `eval_family_overlap == 0`；
+   - 禁止 `flag`/`geo` 走纯 T2I；禁止单条 doc 复制 10 行（必须 `doc_text_repeat == 1` 多图打包）；
+   - 禁止 raw ChatML / `<think>` 进入 `megatron pt`，必须转为 `ch_qa_knowledge_prose`（`<= 15%`）；
+   - Direct 桶 `>= 80%` 为来自通过 CoT 的高质 `Clean Direct Twins`，严禁仅由失败降级垃圾垄断直答模式。
+4. **不将权重、大体积数据或运行临时目录（`output_demo/`、`__pycache__/`）纳入 Git**。
 
 ---
 
 ## 4. 提交前必跑验证命令
 
-在仓库根目录（`~/Documents/Coding/CPT-SFT`）下执行，全部通过后方可 `git commit` / `git push`：
-
 ```bash
-# 1. Python 语法编译检查
 python3 -m py_compile training/lite/*.py training/flash/*.py training/pro/*.py training/pro/montessori/*.py tests/*.py tools/*.py
-
-# 2. 标准库回归与单元测试
 python3 tests/test_lite_flash_pro_architecture.py -v
 python3 tests/test_b300_mm_cpt_pipeline.py -v
 python3 tests/test_unified_v1_v4_pipeline.py -v
 python3 tests/test_montessori_pipeline.py -v
 python3 tests/test_recommended_pipeline.py -v
-
-# 3. 训练与合成流水线 Dry-Run 检查
-bash training/cpt_27b/run_cpt_27b_b300.sh lite --model /data/autovision-cfs/autovision-notebook/algo4/models/Qwen3.5-27B
+bash training/cpt_27b/run_cpt_27b_b300.sh flash --model /data/autovision-cfs/autovision-notebook/algo4/models/Qwen3.5-27B
 WORK_DIR=/tmp/cpt_sft_lite_check DEMO=1 DRY_RUN=1 bash training/lite/run_lite_pipeline.sh
 WORK_DIR=/tmp/cpt_sft_flash_check DEMO=1 DRY_RUN=1 bash training/flash/run_flash_pipeline.sh
 WORK_DIR=/tmp/cpt_sft_pro_check DEMO=1 DRY_RUN=1 bash training/pro/run_pro_pipeline.sh
 DRY_RUN=1 bash training/pro/montessori/run_montessori_pipeline.sh
-DATASET=training/swift/examples/example_sft.jsonl DRY_RUN=1 bash training/swift/train_qwen35_27b_swift.sh
-DATASET=training/swift/examples/example_sft.jsonl DRY_RUN=1 bash training/swift/train_b300_swift.sh
-bash archive/training/qwen35_27b_h200/train_s1_s3_recommended.sh plan
-
-# 4. 清理演示临时产物并确认 git status 干净
 rm -rf training/pro/montessori/output_demo /tmp/cpt_sft_*_check
 git status -s
 ```

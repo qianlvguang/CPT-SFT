@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Authoritative B300 wrapper for Qwen3.5-27B CPT profiles:
-#   - lite   : Phase A gain experiment (bundle_lite_compat/stage1_train.jsonl, val0, 2 epochs, constant 1e-5)
-#   - stage1 : Phase B full-scale Stage 1 (constant 1e-5 + 6% warmup, saves optim/rng)
-#   - stage2 : Phase B full-scale Stage 2 WSD linear cooldown
-#   - pro    : Phase C incremental error-cluster CPT (50/30/20 mix, cosine 5e-6)
+# Authoritative B300 wrapper for Qwen3.5-27B CPT / Mid-Training profiles:
+#   - lite    : Phase A proportional slice of Flash (MBS=1, GBS=4, 8192 len, constant 8e-6, val0, ~100-150 steps)
+#   - flash   : Phase B streamlined single-stage Instruct-Aware Mid-Training WSD (MBS=2, GBS=16, 8192 len, linear WSD 8e-6)
+#   - pro     : Phase C program-enhanced Mid-Training WSD (same raw source as Flash + tail curation & cross-modal alignment, 6e-6)
+#   - pro_inc : Phase C rolling incremental error-cluster CPT (50/30/20 mix, cosine 5e-6)
+#   - stage1  : Legacy Phase B two-stage Stage 1 (constant 1e-5 + 6% warmup, saves optim/rng)
+#   - stage2  : Legacy Phase B two-stage Stage 2 WSD linear cooldown
 #
 # Safety gates:
 #   - Dry-run is default; pass `--launch` (and do not set DRY_RUN=1) to actually execute.
@@ -22,7 +24,7 @@ source "$LIB_DIR/hw_b300.sh"
 usage() {
   cat <<'EOF'
 Usage:
-  run_cpt_27b_b300.sh <lite|stage1|stage2|pro> --model <MODEL_PATH> [options] [-- extra_args...]
+  run_cpt_27b_b300.sh <lite|flash|pro|pro_inc|stage1|stage2> --model <MODEL_PATH> [options] [-- extra_args...]
 
 Options:
   --model <path>               Required base model / checkpoint path (or set MODEL env)
@@ -51,12 +53,12 @@ case "${1:-}" in
     usage
     exit 0
     ;;
-  lite|stage1|stage2|pro)
+  lite|flash|pro|pro_inc|stage1|stage2)
     PROFILE="$1"
     shift
     ;;
   *)
-    die 2 "First argument must be profile: lite | stage1 | stage2 | pro (got '${1:-}')"
+    die 2 "First argument must be profile: lite | flash | pro | pro_inc | stage1 | stage2 (got '${1:-}')"
     ;;
 esac
 
@@ -163,19 +165,41 @@ AUTOVISION_ROOT="${AUTOVISION_ROOT:-/data/autovision-cfs/autovision-notebook}"
 DATA_ROOT="${DATA_ROOT:-${AUTOVISION_ROOT}/algo4/tpz/data/v-CPT/pt}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-${AUTOVISION_ROOT}/algo4/tpz/fine-tunning}"
 
+PROFILE_MBS=""
+PROFILE_GBS=""
+PROFILE_SAVE_STEPS=""
+
 case "$PROFILE" in
   lite)
     PHASE="lite"
     DATASET_VAL="${CLI_DATASET:-${DATA_ROOT}/bundle_lite_compat/stage1_train.jsonl}"
     VAL_DATASET_VAL="${CLI_VAL_DATASET:-}"
-    OUTPUT_DIR_VAL="${CLI_OUTPUT_DIR:-${OUTPUT_ROOT}/cpt-qwen3_5-27b-lite-v1.0.0/stage1}"
+    OUTPUT_DIR_VAL="${CLI_OUTPUT_DIR:-${OUTPUT_ROOT}/cpt-qwen3_5-27b-lite-v2.0/stage1}"
     EPOCHS_VAL="${CLI_EPOCHS:-${LITE_EPOCHS:-2}}"
-    LR_VAL="${LR:-1e-5}"
+    LR_VAL="${LR:-8e-6}"
     MIN_LR_VAL="${MIN_LR:-1e-6}"
     SCHED_VAL="${LR_DECAY_STYLE:-constant}"
     WARMUP_VAL="${LR_WARMUP_FRACTION:-0.06}"
     NO_SAVE_OPTIM_VAL="${NO_SAVE_OPTIM:-false}"
     NO_SAVE_RNG_VAL="${NO_SAVE_RNG:-false}"
+    PROFILE_MBS=1
+    PROFILE_GBS=4
+    PROFILE_SAVE_STEPS=40
+    ;;
+  flash)
+    PHASE="flash"
+    DATASET_VAL="${CLI_DATASET:-${DATA_ROOT}/bundle_flash/midtrain_train.jsonl}"
+    VAL_DATASET_VAL="${CLI_VAL_DATASET:-${DATA_ROOT}/bundle_flash/midtrain_val.jsonl}"
+    OUTPUT_DIR_VAL="${CLI_OUTPUT_DIR:-${OUTPUT_ROOT}/cpt-qwen3_5-27b-flash-v2.0/midtrain}"
+    EPOCHS_VAL="${CLI_EPOCHS:-1}"
+    LR_VAL="${LR:-8e-6}"
+    MIN_LR_VAL="${MIN_LR:-1e-6}"
+    SCHED_VAL="${LR_DECAY_STYLE:-WSD}"
+    WARMUP_VAL="${LR_WARMUP_FRACTION:-0.04}"
+    NO_SAVE_OPTIM_VAL="${NO_SAVE_OPTIM:-false}"
+    NO_SAVE_RNG_VAL="${NO_SAVE_RNG:-false}"
+    CLI_STAGE2_DECAY_ITERS="${CLI_STAGE2_DECAY_ITERS:-60}"
+    PROFILE_SAVE_STEPS=64
     ;;
   stage1)
     PHASE="stage1"
@@ -206,6 +230,21 @@ case "$PROFILE" in
     ;;
   pro)
     PHASE="pro"
+    DATASET_VAL="${CLI_DATASET:-${DATA_ROOT}/bundle_pro/pro_midtrain_train.jsonl}"
+    VAL_DATASET_VAL="${CLI_VAL_DATASET:-${DATA_ROOT}/bundle_pro/pro_midtrain_val.jsonl}"
+    OUTPUT_DIR_VAL="${CLI_OUTPUT_DIR:-${OUTPUT_ROOT}/cpt-qwen3_5-27b-pro-v2.0/midtrain}"
+    EPOCHS_VAL="${CLI_EPOCHS:-1}"
+    LR_VAL="${LR:-6e-6}"
+    MIN_LR_VAL="${MIN_LR:-1e-6}"
+    SCHED_VAL="${LR_DECAY_STYLE:-WSD}"
+    WARMUP_VAL="${LR_WARMUP_FRACTION:-0.04}"
+    NO_SAVE_OPTIM_VAL="${NO_SAVE_OPTIM:-false}"
+    NO_SAVE_RNG_VAL="${NO_SAVE_RNG:-false}"
+    CLI_STAGE2_DECAY_ITERS="${CLI_STAGE2_DECAY_ITERS:-45}"
+    PROFILE_SAVE_STEPS=64
+    ;;
+  pro_inc)
+    PHASE="pro_inc"
     DATASET_VAL="${CLI_DATASET:-${DATA_ROOT}/bundle_pro_inc/pro_train.jsonl}"
     VAL_DATASET_VAL="${CLI_VAL_DATASET:-${DATA_ROOT}/bundle_pro_inc/pro_val.jsonl}"
     OUTPUT_DIR_VAL="${CLI_OUTPUT_DIR:-${OUTPUT_ROOT}/cpt-qwen3_5-27b-pro-inc/stage1}"
@@ -216,6 +255,7 @@ case "$PROFILE" in
     WARMUP_VAL="${LR_WARMUP_FRACTION:-0.05}"
     NO_SAVE_OPTIM_VAL="${NO_SAVE_OPTIM:-true}"
     NO_SAVE_RNG_VAL="${NO_SAVE_RNG:-true}"
+    PROFILE_SAVE_STEPS=32
     ;;
 esac
 
@@ -235,11 +275,14 @@ export NO_SAVE_RNG="$NO_SAVE_RNG_VAL"
 export SMOKE="$CLI_SMOKE"
 export DRY_RUN="$EFFECTIVE_DRY_RUN"
 export LAUNCH="$EFFECTIVE_LAUNCH"
-export MICRO_BATCH_SIZE="${MICRO_BATCH_SIZE:-$DEF_MICRO_BATCH_SIZE}"
-export GLOBAL_BATCH_SIZE="${GLOBAL_BATCH_SIZE:-$DEF_GLOBAL_BATCH_SIZE}"
+export MICRO_BATCH_SIZE="${MICRO_BATCH_SIZE:-${PROFILE_MBS:-$DEF_MICRO_BATCH_SIZE}}"
+export GLOBAL_BATCH_SIZE="${GLOBAL_BATCH_SIZE:-${PROFILE_GBS:-$DEF_GLOBAL_BATCH_SIZE}}"
 export MAX_LENGTH="${MAX_LENGTH:-$DEF_MAX_LENGTH}"
 export TP_SIZE="${TP_SIZE:-$DEF_TP_SIZE}"
 export GRADIENT_ACCUMULATION_FUSION="${GRADIENT_ACCUMULATION_FUSION:-$DEF_GRADIENT_ACCUMULATION_FUSION}"
+if [[ -n "${SAVE_STEPS:-$PROFILE_SAVE_STEPS}" ]]; then
+  export SAVE_STEPS="${SAVE_STEPS:-$PROFILE_SAVE_STEPS}"
+fi
 
 if [[ -n "$CLI_TRAIN_ITERS" ]]; then
   export TRAIN_ITERS="$CLI_TRAIN_ITERS"

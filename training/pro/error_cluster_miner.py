@@ -359,9 +359,21 @@ def run_pro_pipeline(
     output_dir: Path,
     total_cpt_rows: int | None = None,
     val_ratio: float = 0.2,
+    round_id: str = "round_01",
+    parent_ckpt: str = "",
+    prev_ledger: Path | None = None,
     seed: int = 42,
 ) -> dict[str, Any]:
-    """Runs Pro gap mining, 50/30/20 incremental CPT bundling, and `sft_overlap=0` SFT isolation."""
+    """Runs Pro gap mining, 50/30/20 incremental CPT bundling, and monotonic `sft_overlap=0` SFT isolation."""
+    prev_tpl_fams: set[str] = set()
+    prev_doc_fams: set[str] = set()
+    prev_rounds: list[dict[str, Any]] = []
+    if prev_ledger and prev_ledger.exists():
+        ledger_data = json.loads(prev_ledger.read_text(encoding="utf-8"))
+        prev_tpl_fams = set(ledger_data.get("cumulative_excluded_template_families") or [])
+        prev_doc_fams = set(ledger_data.get("cumulative_excluded_doc_families") or [])
+        prev_rounds = list(ledger_data.get("rounds") or [])
+
     triaged = mine_error_clusters(error_logs)
     cpt_gap_rows = triaged["cpt_gap_rows"]
 
@@ -389,11 +401,13 @@ def run_pro_pipeline(
         seed=seed,
     )
 
-    # Strict SFT isolation: exclude ANY template_family_id or doc_family_id touched by Pro/Accepted CPT
-    cpt_excluded_tpl_fams = {_template_family_of(r) for r in all_cpt_sources} | {
+    # Strict monotonic SFT isolation: exclude ANY template_family_id or doc_family_id from current or prior rounds
+    round_tpl_fams = {_template_family_of(r) for r in all_cpt_sources} | {
         _template_family_of(r) for r in error_logs
     }
-    cpt_excluded_doc_fams = {_doc_family_of(r) for r in all_cpt_sources}
+    round_doc_fams = {_doc_family_of(r) for r in all_cpt_sources}
+    cpt_excluded_tpl_fams = prev_tpl_fams | round_tpl_fams
+    cpt_excluded_doc_fams = prev_doc_fams | round_doc_fams
 
     sft_isolated: list[dict[str, Any]] = []
     sft_excluded_count = 0
@@ -406,8 +420,12 @@ def run_pro_pipeline(
         sft_isolated.append(cand)
 
     sft_tpl_fams = {_template_family_of(r) for r in sft_isolated}
-    sft_overlap = len(sft_tpl_fams & cpt_excluded_tpl_fams)
-    assert sft_overlap == 0, f"SFT isolation violation: overlap={sft_tpl_fams & cpt_excluded_tpl_fams}"
+    sft_doc_fams = {_doc_family_of(r) for r in sft_isolated}
+    sft_overlap = len(sft_tpl_fams & cpt_excluded_tpl_fams) + len(sft_doc_fams & cpt_excluded_doc_fams)
+    assert sft_overlap == 0, (
+        f"SFT isolation violation: tpl={sft_tpl_fams & cpt_excluded_tpl_fams}, "
+        f"doc={sft_doc_fams & cpt_excluded_doc_fams}"
+    )
 
     bundle_dir = output_dir / "bundle_pro_inc"
     bundle_dir.mkdir(parents=True, exist_ok=True)
@@ -416,14 +434,42 @@ def run_pro_pipeline(
     pro_val_path = bundle_dir / "pro_val.jsonl"
     pro_sft_path = output_dir / "pro_sft_isolated.jsonl"
     manifest_path = output_dir / "pro_manifest.json"
+    ledger_path = output_dir / "iteration_ledger.json"
 
     write_jsonl(prescriptions_path, triaged["index_prescriptions"])
     write_jsonl(pro_train_path, pro_train)
     write_jsonl(pro_val_path, val_rows)
     write_jsonl(pro_sft_path, sft_isolated)
 
+    round_entry = {
+        "round_id": round_id,
+        "parent_ckpt": parent_ckpt,
+        "pro_cpt_train_rows": len(pro_train),
+        "pro_cpt_val_rows": len(val_rows),
+        "round_new_tpl_families": len(round_tpl_fams - prev_tpl_fams),
+        "round_new_doc_families": len(round_doc_fams - prev_doc_fams),
+        "cumulative_excluded_tpl_families_count": len(cpt_excluded_tpl_fams),
+        "cumulative_excluded_doc_families_count": len(cpt_excluded_doc_fams),
+        "sft_isolated_rows": len(sft_isolated),
+        "sft_overlap": sft_overlap,
+    }
+    ledger = {
+        "schema": "pro_iteration_ledger_v1",
+        "latest_round_id": round_id,
+        "parent_ckpt": parent_ckpt,
+        "cumulative_excluded_template_families": sorted(cpt_excluded_tpl_fams),
+        "cumulative_excluded_doc_families": sorted(cpt_excluded_doc_fams),
+        "rounds": prev_rounds + [round_entry],
+    }
+    ledger_path.write_text(
+        json.dumps(ledger, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
     manifest = {
         "schema": "cpt_27b_pro_incremental_v1",
+        "round_id": round_id,
+        "parent_ckpt": parent_ckpt,
         "seed": seed,
         "cluster_counts": triaged["cluster_counts"],
         "index_prescriptions_count": len(triaged["index_prescriptions"]),
@@ -434,6 +480,7 @@ def run_pro_pipeline(
         "target_cpt_mix_shares": TARGET_PRO_CPT_SHARES,
         "actual_cpt_mix_shares": actual_shares,
         "cpt_excluded_families_count": len(cpt_excluded_tpl_fams),
+        "cumulative_excluded_doc_families_count": len(cpt_excluded_doc_fams),
         "sft_isolated_rows": len(sft_isolated),
         "sft_excluded_rows": sft_excluded_count,
         "sft_overlap": sft_overlap,
@@ -453,6 +500,10 @@ def run_pro_pipeline(
             "pro_sft_isolated": {
                 "path": str(pro_sft_path),
                 "sha256": sha256_file(pro_sft_path),
+            },
+            "iteration_ledger": {
+                "path": str(ledger_path),
+                "sha256": sha256_file(ledger_path),
             },
         },
     }
@@ -484,6 +535,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--total-cpt-rows", type=int, default=None)
     parser.add_argument("--val-ratio", type=float, default=0.2)
+    parser.add_argument("--round-id", default="round_01")
+    parser.add_argument("--parent-ckpt", default="")
+    parser.add_argument("--prev-ledger", type=Path, default=None)
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args(argv)
 
@@ -510,6 +564,9 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output_dir,
         total_cpt_rows=args.total_cpt_rows,
         val_ratio=args.val_ratio,
+        round_id=args.round_id,
+        parent_ckpt=args.parent_ckpt,
+        prev_ledger=args.prev_ledger,
         seed=args.seed,
     )
     print(json.dumps(manifest, ensure_ascii=False, indent=2))

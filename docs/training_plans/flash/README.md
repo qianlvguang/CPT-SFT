@@ -1,13 +1,13 @@
-# Phase B：Flash 全量 WSD 与 QA→CoT v0.3 方案
+# Phase B：Flash 去冗余骨干、QA→CoT v0.4 与生图 v2 方案
 
-本目录汇总全量覆盖阶段（**Flash**）的全部多模态 CPT、V1～V4 重构与 QA/CoT 合成方案：
+本目录汇总全量骨干阶段（**Flash 3 步流程**）的全部 Mid-Training、生图 v2 与 CoT v0.4 知识内化方案：
 
 | 文档 | 核心内容 |
 |---|---|
-| [`qa_cot_plan.md`](qa_cot_plan.md) | **QA→CoT v0.3 详案**：227,656 条 `qa_kb_raw.jsonl` 题型台账、`qwen3.8-flash`（thinking ≥ 2048）、冷酷核验风格三禁、八道程序质检门、动态长度（180/350/500 硬下限 + 300/600/900 软上限）、8:2 混配与三方对照设计 |
-| [`b300_multimodal_wiki_rag_cpt_plan.md`](b300_multimodal_wiki_rag_cpt_plan.md) | B300 27B vs Flash-Next 可行性、TP4/DP2 GQA 整除约束、6 通道（+`v2.3 sch` 并入）WSD 两阶段课程与 Qwen-Image 2.1 反事实规范 |
-| [`unified_v1_v4_cpt_qa_pipeline.md`](unified_v1_v4_cpt_qa_pipeline.md) | 历史 V1～V4 三元键去重分流进 CPT/SFT 及监督 Token 重平衡 |
-| [`qa_synthesis_plan.md`](qa_synthesis_plan.md) | 源文档驱动 QA 合成、程序偏移/Hash 核验与独立语义验证 |
-| [`answer_style_sft_plan.md`](answer_style_sft_plan.md) | 严谨详尽、带 `[S1]` 依据引用的机构化风格规范与 2000 条风格收尾 |
+| [`qa_cot_plan.md`](qa_cot_plan.md) | **QA→CoT v0.4 详案**：227k→147k 规范去重、规则(`user`) vs 实体(`reasoning`) 二分知识内化、8 道内化门、`Clean Direct Twins`（防 Thinking=OFF 崩溃）与 `ch_qa_knowledge_prose` CPT 散文化 5 风险管控 |
+| [`image_gen_v2_plan.md`](image_gen_v2_plan.md) | **生图 v2 规范**：8,692 实体按域分区（`logo/audit/doc` 停、`dex` I2I、`flag` 禁纯 T2I、`move` 节流、西甲递归展开）、`gen_kb_v1` 3 路回收、`doc_text_repeat=1` Top 2~4 多图单 Doc 与合成图 `<=25%` 红线 |
+| [`b300_multimodal_wiki_rag_cpt_plan.md`](b300_multimodal_wiki_rag_cpt_plan.md) | B300 27B vs Flash-Next 可行性、TP4/DP2 GQA 整除约束、单阶段 Instruct-Aware WSD（30/35/15/20 混合、`MAX_LENGTH=8192`） |
+| [`unified_v1_v4_cpt_qa_pipeline.md`](unified_v1_v4_cpt_qa_pipeline.md) | 历史 V1～V4 三元键去重分流进 CPT/SFT 及双模统一 SFT |
+| [`qa_synthesis_plan.md`](qa_synthesis_plan.md) · [`answer_style_sft_plan.md`](answer_style_sft_plan.md) | 源文档驱动 QA 合成与机构化风格基线（已融入单轮统一 SFT，砍掉独立风格 SFT） |
 
 可执行代码入口位于 [`training/flash/`](../../../training/flash/README.md)。

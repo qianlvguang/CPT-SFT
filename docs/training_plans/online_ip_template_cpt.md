@@ -1,5 +1,9 @@
 # 线上 IP 审核模板驱动的 CPT → SFT 方案
 
+![CPT-SFT v2.0 同源 Lite / Flash / Pro 全链路流程图](assets/cpt_sft_lite_flash_pro_workflow.png)
+
+> **v2.0 执行架构更新（2026-11-19）**：当前仓库已将本总纲收敛为 **同源三档（Lite ← Flash → Pro）**：Flash 执行去冗余 3 步（CoT v0.4 知识内化 + 生图 v2 多图打包 + 单阶段 WSD Mid-Training 30/35/15/20 + 统一双模 SFT）；Lite 默认使用 [`slice_flash_to_lite.py`](../../training/lite/slice_flash_to_lite.py) 按 15% 整家族分层切片（`MBS=1/GBS=4/8192` 避开 7-step 崩溃）；Pro 在同一份数据上执行 [`enhance_flash_to_pro.py`](../../training/pro/enhance_flash_to_pro.py) 4 项程序增强 + 多轮 `iteration_ledger.json`。详见 [`docs/training_plans/README.md`](README.md)。
+
 首轮以已有人审测试集的 30 个线上模板做 Lite。每个模板绑定现行审核链路，包括实际使用的 RAG 路由、规则及相关图文构造。纯文本、SVG 和网图为这条链路提供证据和训练材料。V1～V4 保留自己的数据来源和用途，作为独立的历史能力回放。两路在训练前分别建包，在同一轮 CPT 中混合。Flash 把模板侧扩到全量现役 IP 审核模板，Pro 增加基于错例的检索、核验和更新。三档共用 **一次多模态 CPT → 一次异模板 SFT → 线上模板回放验收**。
 
 ## 三个版本

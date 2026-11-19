@@ -29,10 +29,54 @@ CANONICAL_CHANNELS: tuple[str, ...] = (
     # v2.3 sch iso channels (merged from Phase A Lite):
     "ch_ip_grounding",
     "ch_ip_negative",
+    # v2 / v0.4 unified Mid-Training channels:
+    "ch_v2_multi_img_doc",
+    "ch_sports_expanded",
+    "ch_v2_cf_pair",
+    "ch_v1_recycled_neg",
+    "ch_qa_knowledge_prose",
+    "ch_direct_anti_collapse",
+    "wiki_rag_qa_cot",
+    "wiki_rag_qa_direct",
     # Compatible / next-iteration Qwen-Image & stub channels:
     "ch1_wiki_text_stub",
     "ch3_qwen_img_synth",
     "ch4_audit_crawl_cf",
+)
+
+# Unified Single-Stage Instruct-Aware Mid-Training 4-bucket target token mix:
+# 30% domain KB & v2 multi-img + 35% real photo replay + 15% CF/distractor + 20% sanitized QA prose/anti-collapse
+MIDTRAIN_BUCKET_WEIGHTS: dict[str, float] = {
+    "domain_kb_v2": 0.30,
+    "real_replay": 0.35,
+    "cf_distractor": 0.15,
+    "qa_prose_anti_collapse": 0.20,
+}
+
+BUCKET_BY_CHANNEL: dict[str, str] = {
+    "ch_qa_knowledge_prose": "qa_prose_anti_collapse",
+    "ch_direct_anti_collapse": "qa_prose_anti_collapse",
+    "wiki_rag_qa_cot": "qa_prose_anti_collapse",
+    "wiki_rag_qa_direct": "qa_prose_anti_collapse",
+    "ch6_general_replay": "real_replay",
+    "ch4_audit_crawl_cf": "cf_distractor",
+    "ch_ip_negative": "cf_distractor",
+    "ch_v2_cf_pair": "cf_distractor",
+    "ch_v1_recycled_neg": "cf_distractor",
+    "ch3_qwen_img_synth": "cf_distractor",
+    "ch5_flash_rag_raft": "cf_distractor",
+    "ch_text_doc": "domain_kb_v2",
+    "ch1_wiki_text_stub": "domain_kb_v2",
+    "ch_mm_doc": "domain_kb_v2",
+    "ch_v2_multi_img_doc": "domain_kb_v2",
+    "ch_sports_expanded": "domain_kb_v2",
+    "ch_rel_jump": "domain_kb_v2",
+    "ch2_std_logo_flag": "domain_kb_v2",
+    "ch_ip_grounding": "domain_kb_v2",
+}
+
+SYNTHETIC_CHANNELS = frozenset(
+    {"ch3_qwen_img_synth", "ch_v2_multi_img_doc", "ch_sports_expanded", "ch_v2_cf_pair", "ch_v1_recycled_neg"}
 )
 
 STAGE1_TOKEN_WEIGHTS: dict[str, float] = {
@@ -103,6 +147,15 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def bucket_for_channel(channel: str) -> str:
+    return BUCKET_BY_CHANNEL.get(channel, "domain_kb_v2")
+
+
+def _record_text_content(record: dict[str, Any]) -> str:
+    messages = record.get("messages") or []
+    return "\n".join(str(m.get("content") or "") for m in messages if isinstance(m, dict))
+
+
 def estimate_record_tokens(
     content: str,
     num_images: int,
@@ -113,6 +166,53 @@ def estimate_record_tokens(
     other_chars = max(0, len(content) - zh_chars)
     text_tokens = int(round(zh_chars / 1.6 + other_chars / 4.0))
     return max(1, text_tokens + num_images * tokens_per_image)
+
+
+def validate_midtrain_record(
+    record: dict[str, Any],
+    *,
+    allow_custom_channels: bool = False,
+) -> list[str]:
+    """Validates both single-assistant CPT rows and ChatML CoT replay rows for Mid-Training."""
+    messages = record.get("messages")
+    if isinstance(messages, list) and len(messages) == 1:
+        return validate_cpt_record(record, allow_custom_channels=allow_custom_channels)
+
+    errors: list[str] = []
+    channel = record.get("channel")
+    if not isinstance(channel, str) or not channel.strip():
+        errors.append("missing_channel")
+    elif not allow_custom_channels and channel not in CANONICAL_CHANNELS:
+        errors.append(f"unknown_channel:{channel}")
+
+    doc_family_id = record.get("doc_family_id")
+    if not isinstance(doc_family_id, str) or not doc_family_id.strip():
+        errors.append("missing_doc_family_id")
+
+    if not isinstance(messages, list) or len(messages) < 2:
+        errors.append("midtrain_chatml_requires_at_least_2_messages")
+        return errors
+
+    roles = [m.get("role") if isinstance(m, dict) else None for m in messages]
+    if "user" not in roles or roles[-1] != "assistant":
+        errors.append("midtrain_chatml_requires_user_and_trailing_assistant")
+    for m in messages:
+        if not isinstance(m, dict) or not str(m.get("content") or "").strip():
+            errors.append("empty_chatml_message")
+            break
+
+    images = record.get("images") or []
+    if not isinstance(images, list) or any(not isinstance(i, str) or not i.strip() for i in images):
+        errors.append("invalid_images_list")
+        return errors
+
+    combined = _record_text_content(record)
+    placeholder_count = combined.count(IMAGE_PLACEHOLDER)
+    if placeholder_count != len(images):
+        errors.append(
+            f"image_placeholder_mismatch:placeholders={placeholder_count},images={len(images)}"
+        )
+    return errors
 
 
 def validate_cpt_record(
@@ -232,6 +332,44 @@ def to_swift_pt_row(record: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
+def to_midtrain_row(record: dict[str, Any]) -> dict[str, Any]:
+    """Formats a CPT or CoT replay record for unified Instruct-Aware Mid-Training."""
+    messages = record.get("messages") or []
+    if len(messages) == 1:
+        row = to_swift_pt_row(record)
+    else:
+        row = {
+            "messages": [
+                {"role": str(m["role"]), "content": str(m["content"])}
+                for m in messages
+            ],
+            "channel": record["channel"],
+            "doc_family_id": record["doc_family_id"],
+        }
+        images = record.get("images") or []
+        if images:
+            row["images"] = list(images)
+    ch = str(record["channel"])
+    row["bucket"] = str(record.get("bucket") or bucket_for_channel(ch))
+    for opt_key in (
+        "sample_id",
+        "source_kind",
+        "is_unresolved_tail",
+        "example_only",
+        "entity_id",
+        "domain",
+        "enable_thinking",
+        "task_type",
+        "cot_mode",
+        "is_synthetic_image",
+        "synthetic_image_count",
+        "doc_text_repeat",
+    ):
+        if opt_key in record:
+            row[opt_key] = record[opt_key]
+    return row
+
+
 def apply_length_guard(
     records: list[dict[str, Any]],
     *,
@@ -252,7 +390,7 @@ def apply_length_guard(
     kept: list[dict[str, Any]] = []
     dropped_by_channel: Counter[str] = Counter()
     for rec in records:
-        content = rec["messages"][0]["content"]
+        content = _record_text_content(rec)
         n_img = len(rec.get("images") or [])
         est_tok = estimate_record_tokens(content, n_img, tokens_per_image=tokens_per_image)
         if est_tok > max_tokens:
@@ -302,7 +440,7 @@ def _allocate_token_balanced_counts(
     for ch in present_channels:
         tok_list = [
             estimate_record_tokens(
-                r["messages"][0]["content"],
+                _record_text_content(r),
                 len(r.get("images") or []),
                 tokens_per_image=tokens_per_image,
             )
@@ -494,7 +632,7 @@ def summarize_rows(
 
     for r in rows:
         ch = str(r["channel"])
-        content = r["messages"][0]["content"]
+        content = _record_text_content(r)
         n_img = len(r.get("images") or [])
         tok = estimate_record_tokens(content, n_img, tokens_per_image=tokens_per_image)
         ch_rows[ch] += 1
@@ -674,6 +812,391 @@ def build_cpt_bundle(
     return manifest
 
 
+def sanitize_qa_for_cpt(record: dict[str, Any]) -> dict[str, Any]:
+    """Converts multi-turn ChatML / `<think>` QA into single-assistant CPT prose (zero role/tag pollution)."""
+    messages = record.get("messages") or []
+    user_txt = ""
+    assistant_txt = ""
+    for m in messages:
+        if not isinstance(m, dict):
+            continue
+        role = m.get("role")
+        content = str(m.get("content") or "")
+        if role == "user":
+            user_txt = content
+        elif role == "assistant":
+            assistant_txt = content
+
+    question = ""
+    if "问题：" in user_txt:
+        question = user_txt.split("问题：", 1)[1].strip()
+    elif user_txt:
+        question = re.sub(r"【本次审核给定规则】[\s\S]*?(?=\n\n|$)", "", user_txt).strip()
+
+    cleaned_ans = re.sub(r"</?think>", "", assistant_txt)
+    cleaned_ans = re.sub(r"\[(?:S|R)\d+\]", "", cleaned_ans).strip()
+
+    parts: list[str] = []
+    if question:
+        parts.append(f"[领域知识命题] {question}")
+    if cleaned_ans:
+        parts.append(f"[推演与规范结论] {cleaned_ans}")
+    prose = "\n".join(parts) or cleaned_ans or user_txt or "领域知识条目"
+
+    out = dict(record)
+    out["channel"] = "ch_qa_knowledge_prose"
+    out["bucket"] = "qa_prose_anti_collapse"
+    out["is_qa_prose"] = True
+    out.pop("enable_thinking", None)
+    out["messages"] = [{"role": "assistant", "content": prose}]
+    return out
+
+
+def _row_synth_image_count(row: dict[str, Any]) -> int:
+    imgs = row.get("images") or []
+    if not imgs:
+        return 0
+    if "synthetic_image_count" in row:
+        return max(0, int(row["synthetic_image_count"]))
+    if row.get("is_synthetic_image") or row.get("channel") in SYNTHETIC_CHANNELS:
+        return len(imgs)
+    return 0
+
+
+def compute_synthetic_image_share(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    total_images = sum(len(r.get("images") or []) for r in rows)
+    synth_images = sum(_row_synth_image_count(r) for r in rows)
+    share = round(synth_images / total_images, 4) if total_images > 0 else 0.0
+    return {
+        "synth_images": synth_images,
+        "total_images": total_images,
+        "real_images": max(0, total_images - synth_images),
+        "synth_image_share": share,
+    }
+
+
+def _is_qa_prose_row(row: dict[str, Any]) -> bool:
+    return bool(row.get("is_qa_prose")) or str(row.get("channel")) in {
+        "ch_qa_knowledge_prose",
+        "wiki_rag_qa_cot",
+        "wiki_rag_qa_direct",
+    }
+
+
+def extract_families_from_paths(paths: list[Path]) -> set[str]:
+    families: set[str] = set()
+    for p in paths:
+        if not p.exists():
+            continue
+        for row in load_jsonl(p):
+            fam = str(row.get("doc_family_id") or "").strip()
+            if fam:
+                families.add(fam)
+    return families
+
+
+def _summarize_buckets(rows: list[dict[str, Any]], *, tokens_per_image: int) -> dict[str, Any]:
+    b_rows: Counter[str] = Counter()
+    b_tokens: Counter[str] = Counter()
+    b_images: Counter[str] = Counter()
+    for r in rows:
+        b = str(r.get("bucket") or bucket_for_channel(str(r["channel"])))
+        tok = estimate_record_tokens(
+            _record_text_content(r),
+            len(r.get("images") or []),
+            tokens_per_image=tokens_per_image,
+        )
+        b_rows[b] += 1
+        b_tokens[b] += tok
+        b_images[b] += len(r.get("images") or [])
+    tot_tok = sum(b_tokens.values()) or 1
+    return {
+        b: {
+            "rows": b_rows[b],
+            "images": b_images[b],
+            "estimated_tokens": b_tokens[b],
+            "token_share": round(b_tokens[b] / tot_tok, 4),
+        }
+        for b in sorted(b_rows.keys())
+    }
+
+
+def build_midtrain_bundle(
+    records: list[dict[str, Any]],
+    output_dir: Path,
+    *,
+    val_ratio: float = 0.05,
+    total_rows: int | None = None,
+    max_tokens: int = 8192,
+    max_row_repeats: int = 2,
+    max_synth_image_share: float = 0.25,
+    max_qa_prose_share: float = 0.15,
+    allow_raw_chatml_in_cpt: bool = False,
+    excluded_eval_families: set[str] | None = None,
+    tokens_per_image: int = 512,
+    seed: int = 42,
+    allow_custom_channels: bool = False,
+) -> dict[str, Any]:
+    """Builds a single-stage Instruct-Aware Mid-Training bundle with anti-degradation & QA-risk guards."""
+    if not records:
+        raise ValueError("input records must not be empty")
+
+    excluded_set = excluded_eval_families or set()
+    sanitized_count = 0
+    eval_dropped = 0
+    cleaned_records: list[dict[str, Any]] = []
+
+    for idx, rec in enumerate(records):
+        errs = validate_midtrain_record(rec, allow_custom_channels=allow_custom_channels)
+        if errs:
+            sid = rec.get("sample_id", f"index_{idx}")
+            raise ValueError(f"Record {sid} failed midtrain validation: {errs}")
+
+        item = dict(rec)
+        needs_sanitize = (
+            len(item.get("messages") or []) > 1
+            or item.get("channel") in {"wiki_rag_qa_cot", "wiki_rag_qa_direct"}
+            or "<think>" in _record_text_content(item).lower()
+        )
+        if needs_sanitize and not allow_raw_chatml_in_cpt:
+            item = sanitize_qa_for_cpt(item)
+            sanitized_count += 1
+
+        if _is_qa_prose_row(item) and str(item.get("doc_family_id")) in excluded_set:
+            eval_dropped += 1
+            continue
+
+        item["bucket"] = bucket_for_channel(str(item["channel"]))
+        cleaned_records.append(item)
+
+    if not cleaned_records:
+        raise ValueError("No records remained after QA-in-CPT eval exclusion / sanitization.")
+
+    guarded_records, length_guard_report = apply_length_guard(
+        cleaned_records,
+        max_tokens=max_tokens,
+        tokens_per_image=tokens_per_image,
+    )
+    if not guarded_records:
+        raise ValueError("All records exceeded --max-tokens length guard.")
+
+    train_records, val_records = split_by_doc_family(
+        guarded_records,
+        val_ratio=val_ratio,
+        seed=seed,
+    )
+
+    rng = random.Random(seed)
+    by_bucket: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for r in train_records:
+        by_bucket[bucket_for_channel(str(r["channel"]))].append(r)
+
+    present_buckets = [b for b, pool in by_bucket.items() if pool]
+    # Allocate counts across present buckets capping QA prose share to <= max_qa_prose_share
+    eff_weights: dict[str, float] = {}
+    for b in present_buckets:
+        w = MIDTRAIN_BUCKET_WEIGHTS.get(b, 0.25)
+        if b == "qa_prose_anti_collapse":
+            w = min(w, max_qa_prose_share)
+        eff_weights[b] = w
+
+    target_total = total_rows or max(len(train_records), len(present_buckets) * 4)
+    avg_bucket_tok = {
+        b: (
+            sum(
+                estimate_record_tokens(
+                    _record_text_content(r),
+                    len(r.get("images") or []),
+                    tokens_per_image=tokens_per_image,
+                )
+                for r in by_bucket[b]
+            )
+            / len(by_bucket[b])
+        )
+        for b in present_buckets
+    }
+    raw_scores = {b: eff_weights[b] / max(1.0, avg_bucket_tok[b]) for b in present_buckets}
+    score_sum = sum(raw_scores.values()) or 1.0
+
+    selected: list[dict[str, Any]] = []
+    copy_counts: Counter[str] = Counter()
+
+    for b in sorted(present_buckets):
+        pool = list(by_bucket[b])
+        rng.shuffle(pool)
+        desired = max(1, int(round(target_total * (raw_scores[b] / score_sum))))
+        cap = len(pool) * max(1, max_row_repeats)
+        desired = min(desired, cap)
+        # Prioritize non-synthetic & tail/domain diversity when filling up to max_row_repeats
+        expanded: list[dict[str, Any]] = []
+        for rep in range(max(1, max_row_repeats)):
+            for r in pool:
+                if len(expanded) >= desired:
+                    break
+                expanded.append(r)
+        for r in expanded:
+            selected.append(r)
+            copy_counts[_row_identity_key(r)] += 1
+
+    # 1. Enforce QA prose token share <= max_qa_prose_share
+    qa_cap_applied = False
+    def _calc_qa_share(rows_list: list[dict[str, Any]]) -> float:
+        qa_tok = sum(
+            estimate_record_tokens(_record_text_content(r), len(r.get("images") or []), tokens_per_image=tokens_per_image)
+            for r in rows_list
+            if _is_qa_prose_row(r)
+        )
+        tot_tok = sum(
+            estimate_record_tokens(_record_text_content(r), len(r.get("images") or []), tokens_per_image=tokens_per_image)
+            for r in rows_list
+        )
+        return (qa_tok / tot_tok) if tot_tok > 0 else 0.0
+
+    non_qa_pool = [r for r in train_records if not _is_qa_prose_row(r)]
+    rng.shuffle(non_qa_pool)
+    while _calc_qa_share(selected) > max_qa_prose_share:
+        added_real = False
+        for cand in non_qa_pool:
+            cid = _row_identity_key(cand)
+            if copy_counts[cid] < max_row_repeats:
+                selected.append(cand)
+                copy_counts[cid] += 1
+                added_real = True
+                break
+        if _calc_qa_share(selected) <= max_qa_prose_share:
+            break
+        if not added_real:
+            qa_indices = [
+                i for i, r in enumerate(selected) if _is_qa_prose_row(r)
+            ]
+            if len(qa_indices) <= 0:
+                break
+            # Drop largest token QA prose item first
+            drop_idx = max(
+                qa_indices,
+                key=lambda idx: estimate_record_tokens(
+                    _record_text_content(selected[idx]), len(selected[idx].get("images") or []), tokens_per_image=tokens_per_image
+                ),
+            )
+            popped = selected.pop(drop_idx)
+            copy_counts[_row_identity_key(popped)] -= 1
+            qa_cap_applied = True
+
+    # 2. Enforce Synthetic Image Share <= max_synth_image_share
+    synth_cap_applied = False
+    real_img_pool = [
+        r for r in train_records if (len(r.get("images") or []) > 0 and _row_synth_image_count(r) == 0)
+    ]
+    rng.shuffle(real_img_pool)
+    while True:
+        img_stats = compute_synthetic_image_share(selected)
+        if img_stats["total_images"] == 0 or img_stats["synth_image_share"] <= max_synth_image_share:
+            break
+        # First try adding real images up to max_row_repeats before dropping synthetic rows
+        added_real_img = False
+        for cand in real_img_pool:
+            cid = _row_identity_key(cand)
+            if copy_counts[cid] < max_row_repeats:
+                selected.append(cand)
+                copy_counts[cid] += 1
+                added_real_img = True
+                break
+        if added_real_img:
+            continue
+
+        synth_indices = [i for i, r in enumerate(selected) if _row_synth_image_count(r) > 0]
+        if not synth_indices:
+            break
+        bucket_counts_now = Counter(bucket_for_channel(str(r["channel"])) for r in selected)
+        droppable = [
+            i for i in synth_indices if bucket_counts_now[bucket_for_channel(str(selected[i]["channel"]))] > 1
+        ] or synth_indices
+        drop_idx = max(droppable, key=lambda i: _row_synth_image_count(selected[i]))
+        popped = selected.pop(drop_idx)
+        copy_counts[_row_identity_key(popped)] -= 1
+        synth_cap_applied = True
+
+    rng.shuffle(selected)
+    train_out = [to_midtrain_row(r) for r in selected]
+    val_out = [to_midtrain_row(r) for r in val_records]
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    train_path = output_dir / "midtrain_train.jsonl"
+    val_path = output_dir / "midtrain_val.jsonl"
+    manifest_path = output_dir / "midtrain_manifest.json"
+    write_jsonl(train_path, train_out)
+    write_jsonl(val_path, val_out)
+
+    final_img_audit = compute_synthetic_image_share(train_out)
+    final_img_audit["cap_applied"] = synth_cap_applied
+    final_img_audit["max_synth_image_share"] = max_synth_image_share
+
+    raw_chatml_count = sum(
+        1
+        for r in train_out
+        if len(r.get("messages") or []) > 1 or "<think>" in _record_text_content(r).lower()
+    )
+    qa_prose_eval_overlap = len(
+        {str(r["doc_family_id"]) for r in (train_out + val_out) if _is_qa_prose_row(r)}
+        & excluded_set
+    )
+    doc_text_repeats = [
+        int(r.get("doc_text_repeat", 1))
+        for r in train_out
+        if r.get("channel") in {"ch_v2_multi_img_doc", "ch_sports_expanded"}
+    ]
+
+    qa_cpt_risk_audit = {
+        "allow_raw_chatml_in_cpt": allow_raw_chatml_in_cpt,
+        "raw_chatml_sanitized_to_prose": sanitized_count,
+        "raw_chatml_in_cpt_count": raw_chatml_count,
+        "qa_prose_token_share": round(_calc_qa_share(train_out), 4),
+        "max_qa_prose_share": max_qa_prose_share,
+        "qa_prose_cap_applied": qa_cap_applied,
+        "eval_family_dropped": eval_dropped,
+        "eval_family_overlap": qa_prose_eval_overlap,
+        "max_doc_text_repeat": max(doc_text_repeats, default=1),
+    }
+
+    train_summary = summarize_rows(train_out, tokens_per_image=tokens_per_image)
+    val_summary = summarize_rows(val_out, tokens_per_image=tokens_per_image)
+    bucket_summary = _summarize_buckets(train_out, tokens_per_image=tokens_per_image)
+
+    manifest = {
+        "schema": "ms_swift_midtrain_v2",
+        "seed": seed,
+        "val_ratio": val_ratio,
+        "max_tokens": max_tokens,
+        "max_row_repeats": max_row_repeats,
+        "tokens_per_image_estimate": tokens_per_image,
+        "length_guard": length_guard_report,
+        "doc_family_overlap": len(
+            {str(r["doc_family_id"]) for r in train_out}
+            & {str(r["doc_family_id"]) for r in val_out}
+        ),
+        "bucket_summary": bucket_summary,
+        "synthetic_image_audit": final_img_audit,
+        "qa_cpt_risk_audit": qa_cpt_risk_audit,
+        "artifacts": {
+            "midtrain_train": {
+                "path": str(train_path),
+                "sha256": sha256_file(train_path),
+                "summary": train_summary,
+            },
+            "midtrain_val": {
+                "path": str(val_path),
+                "sha256": sha256_file(val_path),
+                "summary": val_summary,
+            },
+        },
+    }
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return manifest
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -681,25 +1204,36 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         nargs="*",
         type=Path,
         default=[],
-        help="Input JSONL files conforming to the 6-channel CPT schema.",
+        help="Input JSONL files conforming to CPT / Mid-Training schema.",
     )
     parser.add_argument(
         "--demo",
         action="store_true",
-        help="Build a local synthetic 6-channel demo bundle from examples/cpt_mm_6ch_example.jsonl.",
+        help="Build a local synthetic demo bundle.",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["cpt_2stage", "midtrain"],
+        default="cpt_2stage",
+        help="`cpt_2stage` (legacy stage1+stage2) or `midtrain` (single-stage 4-bucket bundle).",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         required=True,
-        help="Output directory for stage1_train.jsonl, stage2_cooldown.jsonl, val.jsonl, and manifest.json.",
+        help="Output directory for JSONL bundle and manifest JSON.",
     )
     parser.add_argument("--val-ratio", type=float, default=0.02)
     parser.add_argument("--stage1-rows", type=int, default=None)
     parser.add_argument("--stage2-rows", type=int, default=None)
+    parser.add_argument("--total-rows", type=int, default=None)
     parser.add_argument("--tail-oversample", type=int, default=2)
     parser.add_argument("--max-tokens", type=int, default=16384)
     parser.add_argument("--max-row-repeats", type=int, default=None)
+    parser.add_argument("--max-synth-image-share", type=float, default=0.25)
+    parser.add_argument("--max-qa-prose-share", type=float, default=0.15)
+    parser.add_argument("--exclude-families-from", nargs="*", type=Path, default=[])
+    parser.add_argument("--allow-raw-chatml-in-cpt", action="store_true")
     parser.add_argument("--tokens-per-image", type=int, default=512)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--allow-custom-channels", action="store_true")
@@ -716,7 +1250,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.inputs:
         records = []
         for path in args.inputs:
-            records.extend(load_jsonl(path))
+            if path.exists():
+                records.extend(load_jsonl(path))
         val_ratio = args.val_ratio
         stage1_rows = args.stage1_rows
         stage2_rows = args.stage2_rows
@@ -724,19 +1259,70 @@ def main(argv: list[str] | None = None) -> int:
         print("Specify --demo or at least one file via --inputs.", file=sys.stderr)
         return 2
 
-    manifest = build_cpt_bundle(
-        records,
-        args.output_dir,
-        val_ratio=val_ratio,
-        stage1_rows=stage1_rows,
-        stage2_rows=stage2_rows,
-        tail_oversample=args.tail_oversample,
-        max_tokens=args.max_tokens,
-        max_row_repeats=args.max_row_repeats,
-        tokens_per_image=args.tokens_per_image,
-        seed=args.seed,
-        allow_custom_channels=args.allow_custom_channels,
-    )
+    if args.mode == "midtrain":
+        if args.demo:
+            records.extend(
+                [
+                    {
+                        "sample_id": "demo_qa_prose_01",
+                        "doc_family_id": "fam_demo_prose_01",
+                        "channel": "ch_qa_knowledge_prose",
+                        "is_qa_prose": True,
+                        "is_unresolved_tail": False,
+                        "images": [],
+                        "messages": [
+                            {
+                                "role": "assistant",
+                                "content": "[领域知识命题] 示例电鼠P面部识别要素有哪些？\n[稳定结论锚点] 黄色短毛躯干搭配红色圆形电气囊、黑色耳尖与闪电状锯齿折尾。",
+                            }
+                        ],
+                    },
+                    {
+                        "sample_id": "demo_qa_prose_02",
+                        "doc_family_id": "fam_demo_prose_02",
+                        "channel": "ch_qa_knowledge_prose",
+                        "is_qa_prose": True,
+                        "is_unresolved_tail": True,
+                        "images": [],
+                        "messages": [
+                            {
+                                "role": "assistant",
+                                "content": "[领域知识命题] 无标高奢B款马鞍包设计要素侵权边界为何？\n[稳定结论锚点] 需同时具备不对称弧面盖体、马蹄形五金锁扣与双轨斜向工程缝线。",
+                            }
+                        ],
+                    },
+                ]
+            )
+        excluded_eval = extract_families_from_paths(args.exclude_families_from)
+        manifest = build_midtrain_bundle(
+            records,
+            args.output_dir,
+            val_ratio=val_ratio,
+            total_rows=args.total_rows,
+            max_tokens=8192 if args.max_tokens == 16384 and not args.demo else args.max_tokens,
+            max_row_repeats=args.max_row_repeats if args.max_row_repeats is not None else 2,
+            max_synth_image_share=args.max_synth_image_share,
+            max_qa_prose_share=args.max_qa_prose_share,
+            allow_raw_chatml_in_cpt=args.allow_raw_chatml_in_cpt,
+            excluded_eval_families=excluded_eval,
+            tokens_per_image=args.tokens_per_image,
+            seed=args.seed,
+            allow_custom_channels=args.allow_custom_channels,
+        )
+    else:
+        manifest = build_cpt_bundle(
+            records,
+            args.output_dir,
+            val_ratio=val_ratio,
+            stage1_rows=stage1_rows,
+            stage2_rows=stage2_rows,
+            tail_oversample=args.tail_oversample,
+            max_tokens=args.max_tokens,
+            max_row_repeats=args.max_row_repeats,
+            tokens_per_image=args.tokens_per_image,
+            seed=args.seed,
+            allow_custom_channels=args.allow_custom_channels,
+        )
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
     return 0
 

@@ -28,10 +28,12 @@ BACKEND=${BACKEND:-megatron}
 if [[ -n ${PHASE:-} ]]; then
   case "$PHASE" in
     lite) STAGE=lite ;;
+    flash|flash_midtrain) STAGE=flash_midtrain ;;
     stage1|stage1_stable) STAGE=stage1_stable ;;
     stage2|stage2_cooldown) STAGE=stage2_cooldown ;;
-    pro|pro_incremental) STAGE=pro_incremental ;;
-    *) die 2 "Unsupported PHASE: $PHASE (expected lite, stage1, stage2, or pro)" ;;
+    pro|pro_midtrain) STAGE=pro_midtrain ;;
+    pro_inc|pro_incremental) STAGE=pro_incremental ;;
+    *) die 2 "Unsupported PHASE: $PHASE (expected lite, flash, stage1, stage2, pro, or pro_inc)" ;;
   esac
 else
   STAGE=${STAGE:-stage1_stable}
@@ -46,7 +48,7 @@ LAUNCH=${LAUNCH:-0}
 if [[ "$BACKEND" != megatron && "$BACKEND" != swift ]]; then
   die 2 "Unsupported BACKEND: $BACKEND (expected megatron or swift)"
 fi
-if [[ "$STAGE" != lite && "$STAGE" != stage1_stable && "$STAGE" != stage2_cooldown && "$STAGE" != pro_incremental ]]; then
+if [[ "$STAGE" != lite && "$STAGE" != flash_midtrain && "$STAGE" != stage1_stable && "$STAGE" != stage2_cooldown && "$STAGE" != pro_midtrain && "$STAGE" != pro_incremental ]]; then
   die 2 "Unsupported STAGE: $STAGE"
 fi
 if [[ "$TUNER_TYPE" != lora && "$TUNER_TYPE" != full ]]; then
@@ -75,6 +77,12 @@ CLIP_GRAD=${CLIP_GRAD:-1.0}
 
 if [[ "$STAGE" == "pro_incremental" ]]; then
   DEFAULT_LR="5e-6"
+  DEFAULT_MIN_LR="1e-6"
+elif [[ "$STAGE" == "pro_midtrain" && "$TUNER_TYPE" == "full" ]]; then
+  DEFAULT_LR="6e-6"
+  DEFAULT_MIN_LR="1e-6"
+elif [[ ( "$STAGE" == "flash_midtrain" || "$STAGE" == "lite" ) && "$TUNER_TYPE" == "full" ]]; then
+  DEFAULT_LR="8e-6"
   DEFAULT_MIN_LR="1e-6"
 elif [[ "$TUNER_TYPE" == "full" ]]; then
   DEFAULT_LR="1e-5"
@@ -148,12 +156,23 @@ if [[ "$BACKEND" == "megatron" ]]; then
   MTP_NUM_LAYERS=${MTP_NUM_LAYERS:-0}
 
   case "$STAGE" in
-    lite|stage1_stable)
+    lite)
       DEFAULT_SCHED="constant"
       DEFAULT_EPOCHS=2
-      [[ "$STAGE" == "stage1_stable" ]] && DEFAULT_EPOCHS=1
+      DEFAULT_SAVE_STEPS=40
+      DEFAULT_SAVE_LIMIT=3
+      ;;
+    stage1_stable)
+      DEFAULT_SCHED="constant"
+      DEFAULT_EPOCHS=1
       DEFAULT_SAVE_STEPS=128
       DEFAULT_SAVE_LIMIT=3
+      ;;
+    flash_midtrain|pro_midtrain)
+      DEFAULT_SCHED="WSD"
+      DEFAULT_EPOCHS=1
+      DEFAULT_SAVE_STEPS=64
+      DEFAULT_SAVE_LIMIT=4
       ;;
     stage2_cooldown)
       DEFAULT_SCHED="WSD"
@@ -274,7 +293,11 @@ if [[ "$BACKEND" == "megatron" ]]; then
       if (( WARMUP_VAL < 1 )); then WARMUP_VAL=1; fi
       args+=(--lr_warmup_iters "$WARMUP_VAL")
     else
-      args+=(--lr_warmup_fraction "${LR_WARMUP_FRACTION:-0.03}")
+      if [[ "$STAGE" == "flash_midtrain" || "$STAGE" == "pro_midtrain" ]]; then
+        args+=(--lr_warmup_fraction "${LR_WARMUP_FRACTION:-0.04}")
+      else
+        args+=(--lr_warmup_fraction "${LR_WARMUP_FRACTION:-0.03}")
+      fi
     fi
 
     args+=(

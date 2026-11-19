@@ -21,7 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = REPO_ROOT / "docs" / "training_plans" / "assets" / "cpt_sft_lite_flash_pro_workflow.png"
 
 WIDTH = 3600
-HEIGHT = 2280
+HEIGHT = 2320
 
 # Warm Claude Palette (matched to b300_27b_cpt_sft_pipeline.png)
 BG_CREAM = (250, 248, 244)        # #FAF8F4
@@ -176,81 +176,70 @@ class ColumnSpec:
 COLUMNS: list[ColumnSpec] = [
     ColumnSpec(
         num="I",
-        title="源资产台账与归档",
-        tag="v-CPT+Archive",
+        title="源资产与校准底盘",
+        tag="Lake+B300",
         subboxes=[
             SubBoxSpec(
-                title="现役 PT & QA 资产池",
+                title="现役原始资产总账 (三档同源共用)",
                 cards=[
                     CardSpec(
                         cid="A1",
                         theme="blue",
-                        title="pt/cpt_sch_mm.jsonl",
-                        badge="96模板全选",
-                        code_line="11,502 行 (原11,513) · md5 f90e7a01",
+                        title="KB 语料与实体图片库",
+                        badge="263万+8,692",
+                        code_line="kb/(362M) + entities(8,692) + v-bank",
                         lines=[
-                            "desc + elements 原子字段自拼 CPT 正文",
-                            "label 不可信 (7,778 True 含 2,462 无)",
+                            "chunk_kb/kb_gap/kb_sports 含西甲子展开",
+                            "v系263万张唯一实拍图 100% 落袋免验",
                         ],
                     ),
                     CardSpec(
                         cid="A2",
                         theme="blue",
-                        title="cpt_kb_mm + 补充",
-                        badge="T1_FULL 52",
-                        code_line="15,137 + 33 行 → Lite 筛选 550+33",
+                        title="pt/ 58,092 + V1~V4",
+                        badge="五大源池",
+                        code_line="kb_mm 15k + v_mm 22k + sch 11.5k + ch2",
                         lines=[
-                            "a_tier 24 / generic 5 / disney 23 + 30模板",
-                            "排除 ft_mentions · 覆盖 9 个无 sch 模板",
+                            "Lite/Flash/Pro 完全共用同套原始底池",
+                            "V1~V4 去重进回放 · 4,715 条 v2 RAG 归档",
                         ],
                     ),
                     CardSpec(
                         cid="A3",
-                        theme="blue",
-                        title="cpt_ch2_m2 + v_mm",
-                        badge="Flash全量池",
-                        code_line="ch2: 9,420 双图 · v_mm: 22,000 行",
-                        lines=[
-                            "标准 Logo/国旗双图对比 + V1/V3/V4 回放",
-                            "V4 挂检索证据自动升格 ch5_flash_rag_raft",
-                        ],
-                    ),
-                    CardSpec(
-                        cid="A4",
                         theme="purple",
-                        title="qa/qa_kb_raw.jsonl",
-                        badge="227,656 条",
-                        code_line="md5 318fdb1e · 原产 qwen3.8-flash-next",
+                        title="qa_kb_raw 前置去重",
+                        badge="227k->147k",
+                        code_line="清理 80,594 重复 · 147,062 唯一 QA",
                         lines=[
-                            "insufficient 43,748 · audit 35,067 · syn 23,059",
-                            "多证据 50% · answerable False 40,633 · 残行 6",
+                            "synonsense(6)->synthesis · insufficient 19%",
+                            "独立 OOD 金标族零交叉 (eval_overlap=0)",
                         ],
                     ),
                 ],
             ),
             SubBoxSpec(
-                title="外部对照集与历史归档隔离",
+                title="8×B300 校准发射底盘 & 排险",
                 cards=[
                     CardSpec(
-                        cid="A5",
-                        theme="amber",
-                        title="外部 OOD SFT 评测池",
-                        badge="多臂同源",
-                        code_line="doc_family_id 与训练池严格零交叉",
+                        cid="A4",
+                        theme="green",
+                        title="hw_b300.sh 校准配方",
+                        badge="8192 序列",
+                        code_line="TP4 DP2(禁TP8) · TE sm_103 + no fusion",
                         lines=[
-                            "Lite 双臂增益对照与 Flash 三方对照共用",
-                            "密封人审金标不进入 CPT / SFT / 检索库",
+                            "Lite: MBS1/GBS4 (32.8K/step 修 7-step)",
+                            "Flash/Pro: MBS2/GBS16 (131K/step 保8K文)",
                         ],
                     ),
                     CardSpec(
-                        cid="A6",
-                        theme="green",
-                        title="archive/ H200 & QSA",
-                        badge="主线清净",
-                        code_line="archive/training/{qwen35_27b_h200,qsa_muon}",
+                        cid="A5",
+                        theme="amber",
+                        title="archive/ & 发射门禁",
+                        badge="默认dry-run",
+                        code_line="run_cpt_27b_b300.sh <lite|flash|pro>",
                         lines=[
-                            "旧 H200 4.3.2 三阶段线与 35B-A3B QSA 归档",
-                            "保留 test_recommended_pipeline.py 9/9 回归",
+                            "旧 H200 / QSA 已归档 (9/9 回归完整保留)",
+                            "无 --launch 绝不执行 · 偏离预期步数停机",
                         ],
                     ),
                 ],
@@ -259,81 +248,59 @@ COLUMNS: list[ColumnSpec] = [
     ),
     ColumnSpec(
         num="II",
-        title="Phase A · Lite 增益",
-        tag="training/lite",
+        title="CoT v0.4 知识内化",
+        tag="gen_cot",
         subboxes=[
             SubBoxSpec(
-                title="sch iso 改造与通道守卫",
+                title="可变性二分与双轨八门",
                 cards=[
                     CardSpec(
-                        cid="L1",
-                        theme="green",
-                        title="build_cpt_from_sch.py",
-                        badge="sch iso",
-                        code_line="剥问句 → 单 assistant + <image> 置顶",
+                        cid="C1",
+                        theme="purple",
+                        title="rule vs entity 二分",
+                        badge="核心改造",
+                        code_line="split_evidence_by_mutability() 去[Sx]",
                         lines=[
-                            "禁用 polished_text 改写版，仅用 desc+elements",
-                            "KB title-scan 命中且含 S2 升格 ch5 三段式",
+                            "可变规则/流程 -> user 给定规则 [R1..Rm]",
+                            "稳定实体/IP -> 剥离 user 经 reasoning 直出",
                         ],
                     ),
                     CardSpec(
-                        cid="L2",
-                        theme="amber",
-                        title="elements 通道判定",
-                        badge="修2,462行",
-                        code_line="label -> audit_raw_label (仅作审计)",
+                        cid="C2",
+                        theme="purple",
+                        title="v0.4 八道内化门控",
+                        badge="budget>=2048",
+                        code_line="qwen3.8-flash · verify_cot_v04_8gates",
                         lines=[
-                            "elements=空/无 → 强制入 ch_ip_negative",
-                            "正文中显式落盘「元素：无。」防线上误杀",
-                        ],
-                    ),
-                    CardSpec(
-                        cid="L3",
-                        theme="blue",
-                        title="6 大通道汇总",
-                        badge="12,085 行",
-                        code_line="9,549,679 tok · 18.21 步/ep (GBS32×16K)",
-                        lines=[
-                            "grounding 3,352 · negative 5,985 · ch5 2,165",
-                            "kb_text 440 · kb_mm 72 · kb_rel 71 (加和一致)",
+                            "门2 零[Sx]/根据材料 · 门3 锚点覆盖 >=0.65",
+                            "门4 规则+实体同句否定辨析 · Smoke 60 人检",
                         ],
                     ),
                 ],
             ),
             SubBoxSpec(
-                title="bundle_lite_v3_all·val0 & 对照",
+                title="Thinking-OFF 与 CPT 防护",
                 cards=[
                     CardSpec(
-                        cid="L4",
+                        cid="C3",
                         theme="green",
-                        title="val0 打包 + 全量图检",
-                        badge="10,853图 0缺",
-                        code_line="bundle_lite_compat/stage1_train.jsonl",
+                        title="Clean Direct Twins",
+                        badge=">=80% 直答",
+                        code_line="qa_direct_clean_twins + 7:3 混配",
                         lines=[
-                            "包内零重复，val_ratio=0.0 (lite_val 空壳)",
-                            "PIL verify 0 缺 / 0 零字节 / 0 不可解码",
+                            "通过 CoT 派生浓缩锚点直答，防关思考崩溃",
+                            "失败降级 <=20% 占直答，错迹存 DPO 负池",
                         ],
                     ),
                     CardSpec(
-                        cid="L5",
-                        theme="terracotta",
-                        title="Lite CPT (2ep ≈ 36步)",
-                        badge="constant 1e-5",
-                        code_line="cpt-qwen3_5-27b-lite-v1.0.0/stage1",
-                        lines=[
-                            "平铺 constant 1e-5 + warmup 6% (不做 WSD)",
-                            "27B 全参 TP4 DP2 MBS4 GBS32 len=16384",
-                        ],
-                    ),
-                    CardSpec(
-                        cid="L6",
+                        cid="C4",
                         theme="amber",
-                        title="双臂外部 OOD 对照",
-                        badge="Arm A vs B",
-                        code_line="run_lite_pipeline.sh (CPT+OOD vs Base)",
+                        title="CPT 百科散文净化",
+                        badge="零ChatML",
+                        code_line="sanitize_qa_for_cpt() -> midtrain_prose",
                         lines=[
-                            "在同一套外部 OOD SFT 与评测集上对比净增益",
-                            "增益确认后锁定基座并解锁 Phase B 全量线",
+                            "进 CPT 前剥离 <think>/system/user 角色外壳",
+                            "QA 散文硬锁 <=15% 且零 SFT/eval 族泄漏",
                         ],
                     ),
                 ],
@@ -342,70 +309,59 @@ COLUMNS: list[ColumnSpec] = [
     ),
     ColumnSpec(
         num="III",
-        title="B300 权威发射底盘",
-        tag="lib+cpt_27b",
+        title="生图 v2 按域多图",
+        tag="image_v2",
         subboxes=[
             SubBoxSpec(
-                title="统一脚本与 B300 拓扑",
+                title="8,692 实体按域分区路由",
                 cards=[
                     CardSpec(
-                        cid="B1",
-                        theme="blue",
-                        title="run_cpt_27b_b300.sh",
-                        badge="四档Profile",
-                        code_line="lite | stage1 | stage2 | pro --launch",
+                        cid="V1",
+                        theme="amber",
+                        title="停跑与节流减半",
+                        badge="8.7万->3万",
+                        code_line="logo(3426)+audit(423)+doc(43) -> 停",
                         lines=[
-                            "缺省仅 dry-run，传 --launch 才真正发射",
-                            "强制 --model 必填校验并拦截 Flash-Next 误入",
+                            "audit 用 263万 v-bank · move 抽象光效节流75%",
+                            "kb_sports 西甲式联赛->俱乐部->队徽球衣展开",
                         ],
                     ),
                     CardSpec(
-                        cid="B2",
-                        theme="blue",
-                        title="hw_b300.sh + _core.sh",
-                        badge="8×268.6GiB",
-                        code_line="TP4 DP2 (GQA KV=4禁TP8) · MBS4 GBS32",
+                        cid="V2",
+                        theme="green",
+                        title="I2I 保真 & Flag 红线",
+                        badge="禁纯T2I",
+                        code_line="dex(mm=T)->I2I · flag/geo->EditOnly",
                         lines=[
-                            "27B+dist-opt ≈ 67.5GB/卡，余 ~207GB/卡激活",
-                            "freeze_vit=true / aligner=false (2e-6) / 无MTP",
+                            "flag 无矢量底图标为 pending 禁纯 T2I",
+                            "brand 解剖特写上 VLM + OCR/条数计数校验",
                         ],
                     ),
                 ],
             ),
             SubBoxSpec(
-                title="两枚实弹排险与启动核验",
+                title="v1 回收与多图单 Doc 打包",
                 cards=[
                     CardSpec(
-                        cid="B3",
-                        theme="green",
-                        title="地雷 1：APEX fusion",
-                        badge="默认关闭",
-                        code_line="--gradient_accumulation_fusion false",
+                        cid="V3",
+                        theme="purple",
+                        title="gen_kb_v1 三路回收",
+                        badge="9,749张",
+                        code_line="recycle_gen_kb_v1() 三分处置",
                         lines=[
-                            "绕过纯 py apex 骗过 swift 降级导致的",
-                            "fused_weight_gradient_mlp_cuda 缺失崩溃",
+                            "干净 brand 晋升正池 · 畸变配原图 -> v1_neg",
+                            "其余冗余 audit 废片就地剪枝，零浪费",
                         ],
                     ),
                     CardSpec(
-                        cid="B4",
-                        theme="green",
-                        title="地雷 2：TE sm_103 混搭",
-                        badge="卡5全绿×2",
-                        code_line="tpz_caitlin: 老pybind(t2.13)+xayah lib(sm103)",
+                        cid="V4",
+                        theme="blue",
+                        title="多图单 Doc + CF 负例",
+                        badge="repeat==1",
+                        code_line="Top 2~4 图 -> ch_v2_multi_img_doc",
                         lines=[
-                            "验证必须 import transformer_engine.pytorch",
-                            "LayerNormLinear & LayerNormMLP bf16 SMOKE_OK",
-                        ],
-                    ),
-                    CardSpec(
-                        cid="B5",
-                        theme="amber",
-                        title="重发启动纪律与预案",
-                        badge="偏差>10%杀",
-                        code_line="核对启动日志 train_iters≈36 (排 tqdm 0/7)",
-                        lines=[
-                            "偏差 >10% 立即停机登记排查 packing 口径",
-                            "OOM 预案 env MICRO_BATCH_SIZE=2/1 降档",
+                            "禁止 1 doc 拆 10 行 (doc_text_repeat==1)",
+                            "未过 OCR/计数错图配对转 ch_v2_cf_pair 负例",
                         ],
                     ),
                 ],
@@ -414,70 +370,59 @@ COLUMNS: list[ColumnSpec] = [
     ),
     ColumnSpec(
         num="IV",
-        title="Phase B · Flash WSD",
-        tag="training/flash",
+        title="Phase B · Flash 骨干",
+        tag="run_flash",
         subboxes=[
             SubBoxSpec(
-                title="多源重构与 v2.3 全量建包",
+                title="单阶段 WSD Mid-Training (30/35/15/20)",
                 cards=[
                     CardSpec(
                         cid="F1",
                         theme="blue",
-                        title="refactor_v1_v4_pipeline",
-                        badge="三元去重",
-                        code_line="(variant, sample_id, cate_id, images)",
+                        title="去冗余统一建包",
+                        badge="8K+2x限",
+                        code_line="build_mm_wiki_cpt.py --mode midtrain",
                         lines=[
-                            "V2 默认过滤防稀释；V4 final 禁开 thinking",
-                            "V1/V3 难例抽种子交 Qwen-Image 2.1 生反事实图",
+                            "30%域KB多图 + 35%实拍 + 15%CF + 20%散文",
+                            "合成图<=25% · 零raw <think> · 零家族泄漏",
                         ],
                     ),
                     CardSpec(
                         cid="F2",
-                        theme="green",
-                        title="build_mm_wiki_cpt (v2.3)",
-                        badge="16K+倍限",
-                        code_line="--max-tokens 16384 --max-row-repeats 3",
+                        theme="terracotta",
+                        title="单阶段 WSD 训演",
+                        badge="MBS2/GBS16",
+                        code_line="run_cpt_27b_b300.sh flash (WSD 8e-6)",
                         lines=[
-                            "合并 kb/m2/v 全量 + sch (grounding/negative)",
-                            "481 文档家族零泄漏切分，生成 SHA256 清单",
+                            "砍掉两阶段断点与独立风格 SFT，单程收敛",
+                            "swift export --to_hf 输出统一 BF16 底座",
                         ],
                     ),
                 ],
             ),
             SubBoxSpec(
-                title="两阶段 WSD 课程与 HF 导出",
+                title="单轮双模 SFT & 验收",
                 cards=[
                     CardSpec(
                         cid="F3",
                         theme="terracotta",
-                        title="Stage 1 恒定 LR 训练",
-                        badge="保优化器",
-                        code_line="PHASE=stage1 · constant 1e-5 · warmup 6%",
+                        title="V1~V4 + 7:3 统一 SFT",
+                        badge="单轮收敛",
+                        code_line="refactor_v1_v4 + megatron sft (8192)",
                         lines=[
-                            "NO_SAVE_OPTIM=false 保留 AdamW m_t, v_t",
-                            "消除 Stage 2 衔接冷启动 Gradient Spike",
+                            "Think-ON(70%) + Clean Direct Twins(30%)",
+                            "砍掉独立风格 SFT 与 Teacher DPO 防冲突",
                         ],
                     ),
                     CardSpec(
                         cid="F4",
-                        theme="amber",
-                        title="闭卷探针 & Stage 2 选包",
-                        badge="11M~15M tok",
-                        code_line="is_unresolved_tail=true 聚焦顽固长尾",
+                        theme="green",
+                        title="双模上线验收门",
+                        badge="ON / OFF",
+                        code_line="enable_thinking=true & false 双测",
                         lines=[
-                            "严控单行重复 <=3×，防 ch_rel_jump 死记模板",
-                            "以 Stage 1 实打日志步数校准退火步数",
-                        ],
-                    ),
-                    CardSpec(
-                        cid="F5",
-                        theme="terracotta",
-                        title="Stage 2 WSD → HF 底座",
-                        badge="WSD linear",
-                        code_line="--lr_decay_style WSD --lr_wsd_decay_style linear",
-                        lines=[
-                            "swift export --to_hf true 输出 BF16 底座",
-                            "永久留存 Stage 1 退火前档与 Stage 2 末档",
+                            "同时验证带思考高精度与免思考低延迟零崩",
+                            "通过后冻结为 Lite 对照与 Pro 增强基线",
                         ],
                     ),
                 ],
@@ -486,70 +431,59 @@ COLUMNS: list[ColumnSpec] = [
     ),
     ColumnSpec(
         num="V",
-        title="QA→CoT v0.3 & SFT",
-        tag="gen_cot_from_qa",
+        title="Phase A · Lite 切片",
+        tag="training/lite",
         subboxes=[
             SubBoxSpec(
-                title="逆向桥接与 qwen3.8-flash 蒸馏",
+                title="同源按比例切片 (告别 7-step)",
                 cards=[
                     CardSpec(
-                        cid="C1",
-                        theme="purple",
-                        title="题型清洗 + 干扰项重映射",
-                        badge="去位置捷径",
-                        code_line="synonsense(6)→synthesis · [S_old]→[S_new]",
+                        cid="L1",
+                        theme="amber",
+                        title="7-step 崩溃根因修复",
+                        badge="MBS1/GBS4",
+                        code_line="slice_flash_to_lite.py --ratio 0.15",
                         lines=[
-                            "混入 1~3 条同域干扰项后洗牌重排 S1..Sn",
-                            "单轮正则同步重写答案/引文中的引用编号",
+                            "旧95% sch仅150tok/行，524K/step 7步刷完",
+                            "现切Flash 15%，32.8K/step->100~150步",
                         ],
                     ),
                     CardSpec(
-                        cid="C2",
-                        theme="purple",
-                        title="qwen3.8-flash 桥接",
-                        badge="budget≥2048",
-                        code_line="prompts/qa_cot_bridge_v03.md (thinking ON)",
+                        cid="L2",
+                        theme="blue",
+                        title="val0 整家族零分裂",
+                        badge="compat链",
+                        code_line="bundle_lite/lite_train.jsonl (val0)",
                         lines=[
-                            "全链冷酷客观核验流，无 Markdown 死板段头",
-                            "insufficient 双分支 / audit 豁免 / synthesis 仲裁",
+                            "维持 30/35/15/20 与合成/QA 散文比例上限",
+                            "兼容 LITE_MODE=sch_legacy 历史脚本回退",
                         ],
                     ),
                 ],
             ),
             SubBoxSpec(
-                title="八道门控 + 降级 + 三方 SFT",
+                title="快速对照与双模保留门",
                 cards=[
                     CardSpec(
-                        cid="C3",
-                        theme="green",
-                        title="八道程序质检门",
-                        badge="8 Gates",
-                        code_line="verify_cot_8gates() 精确拦截跳步与倒推",
-                        lines=[
-                            "1终答 · 2精度 · 3召回 · 4子串SHA256无段头",
-                            "5反事实 · 6防复述(≤0.55,摘录≤45%) · 7长 · 8三禁",
-                        ],
-                    ),
-                    CardSpec(
-                        cid="C4",
-                        theme="amber",
-                        title="动态长度门 & 降级路由",
-                        badge="禁拼接Quote",
-                        code_line="fact≥180 / mid≥350 / heavy≥500 (软3/6/900)",
-                        lines=[
-                            "失败样本置 reasoning=\"\" + enable_thinking=false",
-                            "落入 qa_direct_fallback 保持思考切换能力",
-                        ],
-                    ),
-                    CardSpec(
-                        cid="C5",
+                        cid="L3",
                         theme="terracotta",
-                        title="三方对照统一 SFT",
-                        badge="8:2 混配",
-                        code_line="ood_only vs +QA-Direct vs +QA-CoT (8:2)",
+                        title="Lite 校准短跑 + OOD",
+                        badge="8e-6 恒定",
+                        code_line="run_cpt_27b_b300.sh lite -> Arm A/B",
                         lines=[
-                            "smoke 50 分层人检后扩量接入统一 SFT",
-                            "监控 loss_V1..V4 + wiki_rag_qa_cot/direct",
+                            "SAVE_STEPS=40 留档，2ep constant 8e-6",
+                            "CPT+OOD vs Base+OOD 隔离纯增益对照",
+                        ],
+                    ),
+                    CardSpec(
+                        cid="L4",
+                        theme="green",
+                        title="步数与防崩预警门",
+                        badge="<60步警",
+                        code_line="projected_steps + Think-ON/OFF 双检",
+                        lines=[
+                            "投影步数 <60 自动预警调小 GBS 或扩比例",
+                            "确认净增益且无 Think-OFF 崩塌放行 Flash",
                         ],
                     ),
                 ],
@@ -558,70 +492,70 @@ COLUMNS: list[ColumnSpec] = [
     ),
     ColumnSpec(
         num="VI",
-        title="Phase C · Pro 闭环",
+        title="Phase C · Pro 演化",
         tag="training/pro",
         subboxes=[
             SubBoxSpec(
-                title="四维归因与 50/30/20 增量",
+                title="同源 4 项程序增强 (零新原始数据)",
                 cards=[
                     CardSpec(
                         cid="P1",
-                        theme="amber",
-                        title="error_cluster_miner.py",
-                        badge="固定权重优先",
-                        code_line="missing_index / mapping_drift → 不更新权重",
+                        theme="purple",
+                        title="密度筛选 + 跨模态对齐",
+                        badge="enhance",
+                        code_line="curate_high_value + alignment_audit",
                         lines=[
-                            "先补索引别名/修映射并固定权重复测 Recall",
-                            "撞风格误杀 & 缺证据强判 verified 后进训练池",
+                            "提权长尾未闭合/多图CF，裁剪低质水词行",
+                            "关联 v2 多图与 CoT v0.4 实体家族锚点",
                         ],
                     ),
                     CardSpec(
                         cid="P2",
                         theme="terracotta",
-                        title="50/30/20 增量 + 隔离",
-                        badge="sft_overlap=0",
-                        code_line="cosine 5e-6 · 从已验收父 CPT 开分支",
+                        title="WiSE-FT & Think-OFF 门",
+                        badge="0.8C+0.2B",
+                        code_line="evaluate_canary_and_wise_ft() 6e-6",
                         lines=[
-                            "50% 新核验缺口 + 30% 已验收模板 + 20% V回放",
-                            "异模板 SFT 强排所有 CPT template_family_id",
+                            "通用掉>2pp 自动生成 0.8*CPT+0.2*Base",
+                            "Think-OFF 掉>2pp 或差值>8pp 触 OPD 蒸馏",
+                        ],
+                    ),
+                    CardSpec(
+                        cid="P3",
+                        theme="purple",
+                        title="学生DPO + OPD 蒸馏",
+                        badge="非Teacher",
+                        code_line="pro_dpo_kto_pairs + pro_opd_bsd_seeds",
+                        lines=[
+                            "CoT 废迹转学生 DPO/KTO + Datawheel 补采",
+                            "OPD Think-ON->OFF 蒸馏拉齐免思考性能",
                         ],
                     ),
                 ],
             ),
             SubBoxSpec(
-                title="跨仓闭环与四维金标验收",
+                title="多轮错例闭环与单调账本",
                 cards=[
                     CardSpec(
-                        cid="P3",
-                        theme="purple",
-                        title="Montessori + 失败 CoT",
-                        badge="DPO/KTO/GRPO",
-                        code_line="qa_dpo_rejected_cots.jsonl + influence_scorer",
-                        lines=[
-                            "单步 Loss 差分探针 I(x,y;D_ref) 筛正例",
-                            "黑盒 API ICDPO 进化提示 + 导 DPO/KTO/GRPO",
-                        ],
-                    ),
-                    CardSpec(
                         cid="P4",
-                        theme="purple",
-                        title="OPD × Datawheel 飞轮",
-                        badge="跨仓联动",
-                        code_line="OPD bsd_api_bridge + ToDi + Datawheel V6",
+                        theme="amber",
+                        title="error_cluster_miner",
+                        badge="不动权重先",
+                        code_line="missing_index/mapping_drift -> 补索引",
                         lines=[
-                            "API CoT 作特权上下文 z 行逐 Token 惩罚归因",
-                            "Datawheel diagnose_and_refill_v6 定向补反事实",
+                            "50%新核验缺口 + 30%已验收 + 20%V回放 5e-6",
+                            "固定权重先验索引与路由，仅混淆类动权重",
                         ],
                     ),
                     CardSpec(
                         cid="P5",
                         theme="green",
-                        title="线上回放与四维验收",
-                        badge="目标 +2 pp",
-                        code_line="固定召回 ACC vs 真实链路 ACC 拆分定位",
+                        title="多轮单调账本",
+                        badge="sft_overlap=0",
+                        code_line="iteration_ledger.json (--prev-ledger)",
                         lines=[
-                            "30/全量宏ACC · 原创误罚 · 二创召回 · 强判率",
-                            "视觉聚焦成对测试 + 95%CI 下界 > 0 方可晋级",
+                            "跨 round_id 累计已用 doc/template 家族",
+                            "全周期断言评测与异模板 SFT 绝对零泄漏",
                         ],
                     ),
                 ],
@@ -759,10 +693,10 @@ def render_diagram(output_path: Path) -> None:
     draw = ImageDraw.Draw(img)
 
     # 1. Header Banner
-    title = "8×B300 Qwen3.5-27B 域适应（Lite / Flash / Pro）与 QA→CoT v0.3 全链路流程图"
+    title = "8×B300 Qwen3.5-27B 同源 Lite / Flash / Pro + CoT v0.4 & 生图 v2 架构图"
     subtitle = (
-        "AutoVision 8×B300 (sm_103) · TP4/DP2/MBS4/GBS32/16K · "
-        "Lite sch iso 12,085行 (9.55M tok) · QA→CoT 227,656条 (qwen3.8-flash + 八道门) · H200/QSA 已归档"
+        "AutoVision 8×B300 (8192) · Flash 3步骨干 (30/35/15/20, QA散文<=15%, 合成图<=25%) · "
+        "Lite 15%切片 (MBS1/GBS4 修7-step) · Pro 同源4增强 + Think-OFF OPD蒸馏"
     )
     draw.text((46, 30), title, font=fonts["title"], fill=INK_MAIN)
     draw.text((48, 84), subtitle, font=fonts["subtitle"], fill=INK_SUB)
@@ -802,7 +736,7 @@ def render_diagram(output_path: Path) -> None:
     total_w = WIDTH - margin_x * 2
     col_w = (total_w - col_gap * (num_cols - 1)) // num_cols
     col_top = 172
-    col_bottom = HEIGHT - 102
+    col_bottom = HEIGHT - 140
 
     card_boxes: dict[str, tuple[int, int, int, int]] = {}
     col_centers_x: list[int] = []
@@ -992,139 +926,158 @@ def render_diagram(output_path: Path) -> None:
     g45 = gutter_x(3)
     g56 = gutter_x(4)
 
-    # Col I -> Col II
+    # Col I -> Col II: 147k dedup QA -> CoT v0.4 split
     draw_orth_connector(
         draw,
-        [right_mid("A1"), (g12, right_mid("A1")[1]), (g12, left_mid("L1")[1]), left_mid("L1")],
+        [right_mid("A3"), (g12, right_mid("A3")[1]), (g12, left_mid("C1")[1]), left_mid("C1")],
+        color=THEMES["purple"]["bar"],
+        end_dir="right",
+    )
+
+    # Top rail: A1 (kb_entities 8,692 + kb_sports) -> V1 (ImageGen v2) cleanly above col_top
+    top_rail_y = 148
+    draw_orth_connector(
+        draw,
+        [
+            right_mid("A1", -16),
+            (g12 + 8, right_mid("A1", -16)[1]),
+            (g12 + 8, top_rail_y),
+            (g23 - 6, top_rail_y),
+            (g23 - 6, left_mid("V1")[1]),
+            left_mid("V1"),
+        ],
+        color=THEMES["amber"]["bar"],
+        end_dir="right",
+        label="entities+sports → 生图v2",
+        label_pos=((g12 + g23) // 2 + 20, top_rail_y),
+        font=fonts["edge_label"],
+        dashed=True,
+    )
+
+    # Col II -> Col IV (top rail 2: C4 qa_midtrain_prose -> F1)
+    draw_orth_connector(
+        draw,
+        [
+            right_mid("C4"),
+            (g23 - 8, right_mid("C4")[1]),
+            (g23 - 8, top_rail_y),
+            (g34 - 10, top_rail_y),
+            (g34 - 10, left_mid("F1", 18)[1]),
+            left_mid("F1", 18),
+        ],
+        color=THEMES["amber"]["bar"],
+        end_dir="right",
+        label="qa_prose<=15% (零<think>)",
+        label_pos=((g23 + g34) // 2 + 10, top_rail_y),
+        font=fonts["edge_label"],
+        dashed=True,
+    )
+
+    # Col III -> Col IV: v2 Multi-Img & CF pairs -> Flash Mid-Training
+    draw_orth_connector(
+        draw,
+        [right_mid("V4"), (g34, right_mid("V4")[1]), (g34, left_mid("F1", -14)[1]), left_mid("F1", -14)],
         color=THEMES["blue"]["bar"],
         end_dir="right",
     )
+    # Separate bottom tracks so zero collinear overlap ever happens
+    bot_rail_0 = HEIGHT - 122
+    bot_rail_1 = HEIGHT - 90
+    bot_rail_2 = HEIGHT - 56
+
     draw_orth_connector(
         draw,
-        [right_mid("A2"), (g12 - 7, right_mid("A2")[1]), (g12 - 7, left_mid("L3")[1]), left_mid("L3")],
+        [right_mid("C3", 10), (g23 + 12, right_mid("C3", 10)[1]), (g23 + 12, bot_rail_0), (g34 - 6, bot_rail_0), (g34 - 6, left_mid("F3")[1]), left_mid("F3")],
+        color=THEMES["green"]["bar"],
+        end_dir="right",
+        label="Clean Direct Twins -> 统一 SFT",
+        label_pos=((g23 + g34) // 2 + 12, bot_rail_0),
+        font=fonts["edge_label"],
+        dashed=True,
+    )
+
+    # Bottom rail 1: A2 (pt 58k + v-bank) -> F2 cleanly below bot_rail_0
+    draw_orth_connector(
+        draw,
+        [
+            right_mid("A2", 20),
+            (g12 - 10, right_mid("A2", 20)[1]),
+            (g12 - 10, bot_rail_1),
+            (g34 - 14, bot_rail_1),
+            (g34 - 14, left_mid("F2")[1]),
+            left_mid("F2"),
+        ],
         color=THEMES["blue"]["bar"],
         end_dir="right",
+        label="同源 pt 58k + 263万 v-bank → Flash WSD",
+        label_pos=((g12 + g34) // 2 - 200, bot_rail_1),
+        font=fonts["edge_label"],
+        dashed=True,
     )
+
+    # Col IV -> Col V: Flash Mid-Training pool -> Lite 15% Stratified Slice
     draw_orth_connector(
         draw,
-        [right_mid("A5"), (g12, right_mid("A5")[1]), (g12, left_mid("L6")[1]), left_mid("L6")],
+        [right_mid("F1"), (g45, right_mid("F1")[1]), (g45, left_mid("L1")[1]), left_mid("L1")],
         color=THEMES["amber"]["bar"],
         end_dir="right",
     )
 
-    # Col II -> Col III
-    draw_orth_connector(
-        draw,
-        [right_mid("L4"), (g23, right_mid("L4")[1]), (g23, left_mid("B1")[1]), left_mid("B1")],
-        color=THEMES["green"]["bar"],
-        end_dir="right",
-    )
-    draw_orth_connector(
-        draw,
-        [right_mid("L5", -14), (g23 + 7, right_mid("L5", -14)[1]), (g23 + 7, left_mid("B2")[1]), left_mid("B2")],
-        color=THEMES["terracotta"]["bar"],
-        end_dir="right",
-        dashed=True,
-    )
-
-    # Col III -> Col IV
-    draw_orth_connector(
-        draw,
-        [right_mid("B1"), (g34, right_mid("B1")[1]), (g34, left_mid("F3")[1]), left_mid("F3")],
-        color=THEMES["terracotta"]["bar"],
-        end_dir="right",
-    )
-    draw_orth_connector(
-        draw,
-        [right_mid("B4"), (g34 + 7, right_mid("B4")[1]), (g34 + 7, left_mid("F5", -16)[1]), left_mid("F5", -16)],
-        color=THEMES["green"]["bar"],
-        end_dir="right",
-    )
-
-    # Col IV -> Col V
-    draw_orth_connector(
-        draw,
-        [right_mid("F5"), (g45, right_mid("F5")[1]), (g45, left_mid("C5")[1]), left_mid("C5")],
-        color=THEMES["terracotta"]["bar"],
-        end_dir="right",
-    )
-
-    # Top rail: A4 (227,656 raw QA) -> C1 (QA->CoT v0.3) cleanly above col_top
-    top_rail_y = 149
+    # Col IV -> Col VI (top rail above Col V: Flash raw pool -> Pro enhance_flash_to_pro + F4 -> P4)
     draw_orth_connector(
         draw,
         [
-            right_mid("A4", -30),
-            (g12 + 8, right_mid("A4", -30)[1]),
-            (g12 + 8, top_rail_y),
-            (g45 - 6, top_rail_y),
-            (g45 - 6, left_mid("C1")[1]),
-            left_mid("C1"),
+            right_mid("F1", -24),
+            (g45 + 10, right_mid("F1", -24)[1]),
+            (g45 + 10, top_rail_y),
+            (g56 - 6, top_rail_y),
+            (g56 - 6, left_mid("P1")[1]),
+            left_mid("P1"),
         ],
         color=THEMES["purple"]["bar"],
         end_dir="right",
-        label="227,656 qa_kb_raw → CoT v0.3",
-        label_pos=((g12 + g45) // 2, top_rail_y),
+        label="与 Flash 共用同套原始源池 → Pro 4项程序增强",
+        label_pos=((g45 + g56) // 2, top_rail_y),
+        font=fonts["edge_label"],
+    )
+    draw_orth_connector(
+        draw,
+        [
+            right_mid("F4", 12),
+            (g45 + 10, right_mid("F4", 12)[1]),
+            (g45 + 10, bot_rail_1),
+            (g56 - 8, bot_rail_1),
+            (g56 - 8, left_mid("P4")[1]),
+            left_mid("P4"),
+        ],
+        color=THEMES["terracotta"]["bar"],
+        end_dir="right",
+        label="线上错例与双模评测 → Pro 闭环",
+        label_pos=((g45 + g56) // 2, bot_rail_1),
         font=fonts["edge_label"],
         dashed=True,
     )
 
-    # Bottom rail 1: A3 (ch2 + v_mm) -> F1 (Flash v2.3) cleanly below col_bottom
-    bot_rail_1 = HEIGHT - 70
-    draw_orth_connector(
-        draw,
-        [
-            right_mid("A3", 40),
-            (g12 - 10, right_mid("A3", 40)[1]),
-            (g12 - 10, bot_rail_1),
-            (g34 - 8, bot_rail_1),
-            (g34 - 8, left_mid("F1")[1]),
-            left_mid("F1"),
-        ],
-        color=THEMES["blue"]["bar"],
-        end_dir="right",
-        label="ch2 + v_mm + V1~V4 → Flash 全量池",
-        label_pos=((g12 + g34) // 2 - 140, bot_rail_1),
-        font=fonts["edge_label"],
-        dashed=True,
-    )
-
-    # Col V -> Col VI
-    draw_orth_connector(
-        draw,
-        [right_mid("C4", 18), (g56 - 7, right_mid("C4", 18)[1]), (g56 - 7, left_mid("P3")[1]), left_mid("P3")],
-        color=THEMES["purple"]["bar"],
-        end_dir="right",
-        dashed=True,
-    )
-    draw_orth_connector(
-        draw,
-        [right_mid("C5"), (g56 + 7, right_mid("C5")[1]), (g56 + 7, left_mid("P5")[1]), left_mid("P5")],
-        color=THEMES["green"]["bar"],
-        end_dir="right",
-    )
-
-    # Bottom rail 2: P2 -> gutter g56 -> bottom rail -> B5 (never passes over Col VI cards!)
-    bot_rail_2 = HEIGHT - 36
+    # Bottom rail 2: P2 -> gutter g56 -> bottom rail -> A5 (cleanly below Cols and above footer!)
     draw_orth_connector(
         draw,
         [
             left_mid("P2", 26),
-            (g56 - 12, left_mid("P2", 26)[1]),
-            (g56 - 12, bot_rail_2),
-            (col_centers_x[2], bot_rail_2),
-            bottom_mid("B5"),
+            (g56 - 14, left_mid("P2", 26)[1]),
+            (g56 - 14, bot_rail_2),
+            (col_centers_x[0], bot_rail_2),
+            bottom_mid("A5"),
         ],
         color=ARROW_ACCENT,
         end_dir="up",
-        label="Pro 50/30/20 增量 CPT 回归 B300 发射链",
-        label_pos=((col_centers_x[2] + g56) // 2, bot_rail_2),
+        label="Pro WSD (pro) + 多轮 50/30/20 增量 (pro_inc) 回归 B300 统一发射底盘",
+        label_pos=((col_centers_x[0] + g56) // 2, bot_rail_2),
         font=fonts["edge_label"],
         dashed=True,
     )
 
-    footer_text = "CPT-SFT · B300 Qwen3.5-27B Lite / Flash / Pro + QA→CoT v0.3 Architecture · 2026-11-18"
-    draw.text((46, HEIGHT - 38), footer_text, font=fonts["col_tag"], fill=INK_MUTED)
+    footer_text = "CPT-SFT v2.0 · Single-Source Lite (15%) / Flash (3-Step) / Pro (4-Upgrade + Ledger) · CoT v0.4 & ImageGen v2 · 2026-11-19"
+    draw.text((46, HEIGHT - 32), footer_text, font=fonts["col_tag"], fill=INK_MUTED)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(output_path, format="PNG", optimize=True)

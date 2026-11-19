@@ -13,10 +13,11 @@ DEF_TP_SIZE=4
 DEF_PP_SIZE=1
 DEF_CP_SIZE=1
 
-# Batch & sequence defaults (Runbook §3: MBS=4, GBS=32, MAX_LENGTH=16384)
-DEF_MICRO_BATCH_SIZE=4
-DEF_GLOBAL_BATCH_SIZE=32
-DEF_MAX_LENGTH=16384
+# Batch & sequence defaults (Calibrated B300 profile: MBS=2, GBS=16, MAX_LENGTH=8192 -> ~131K tok/step)
+# Keeps 4K-8K KB text intact (unlike 16K over-packing which starved short sch/VLM rows to 7 steps)
+DEF_MICRO_BATCH_SIZE=2
+DEF_GLOBAL_BATCH_SIZE=16
+DEF_MAX_LENGTH=8192
 DEF_IMAGE_MAX_TOKEN_NUM=16384
 DEF_VIDEO_MAX_TOKEN_NUM=128
 DEF_FPS_MAX_FRAMES=16
